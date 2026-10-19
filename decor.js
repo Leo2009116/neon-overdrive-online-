@@ -1,7 +1,3 @@
-// ============================================================
-// NEON OVERDRIVE ONLINE // decor.js
-// 2.5D 霓虹渲染
-// ============================================================
 (function () {
   const style = document.createElement("style");
   style.id = "neon-decor-theme";
@@ -220,7 +216,6 @@
       ctx.restore();
     },
 
-    // 多人模式專用：繪製玩家（不同於自己，帶隊伍顏色）
     renderRemotePlayer(ctx, p, lowGlow) {
       drawGroundShadow(ctx, p.x, p.y, MP_CONFIG.PLAYER_RADIUS, 0.32);
       ctx.save();
@@ -229,18 +224,15 @@
       ctx.scale(1, 0.86);
       ctx.lineJoin = "round";
       const teamCol = p.team === "red" ? "#ff0055" : "#00aaff";
-      // 三角形戰機
       ctx.beginPath();
       ctx.moveTo(18, 0); ctx.lineTo(-12, -12); ctx.lineTo(-6, 0); ctx.lineTo(-12, 12);
       ctx.closePath();
       ctx.fillStyle = "#060a14"; ctx.fill();
       drawGlowStroke(ctx, teamCol, 2.2, 6, lowGlow);
-      // 隊伍箭頭
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0, Math.PI * 2);
       ctx.fillStyle = "#fff"; ctx.fill();
       ctx.restore();
-      // 名字
       ctx.save();
       ctx.fillStyle = teamCol;
       ctx.font = "bold 11px Orbitron, sans-serif";
@@ -256,18 +248,15 @@
       ctx.restore();
     },
 
-    // 多人模式：繪製障礙物
     renderObstacle(ctx, o, lowGlow) {
       drawGroundShadow(ctx, o.x, o.y, o.r, 0.4);
       ctx.save();
       ctx.translate(o.x, o.y);
       ctx.scale(1, 0.9);
-      // 六邊形障礙物
       drawPoly(ctx, 6, o.r, Math.PI / 6);
       ctx.fillStyle = "#0a1220";
       ctx.fill();
       drawGlowStroke(ctx, "#ff80ff", 2.5, 8, lowGlow);
-      // 內部紋路
       drawPoly(ctx, 6, o.r * 0.6, Math.PI / 6);
       ctx.strokeStyle = "rgba(255,128,255,.35)";
       ctx.lineWidth = 1.5;
