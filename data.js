@@ -1,7 +1,3 @@
-// ============================================================
-// NEON OVERDRIVE ONLINE // data.js
-// ============================================================
-
 const I18N = {
   zh: {
     sub_title: "2.5D 霓虹星區建造 × DIY 彈幕生存 × 多人團隊對戰",
@@ -151,25 +147,23 @@ const MAP_SIZE = 3600;
 const BUILD_COSTS = { TURRET: 25, TESLA: 40, HEAL: 35, MINER: 50, WALL: 15, VORTEX: 60 };
 const GRID_DIV = 3;
 
-// ================== 多人模式常數 ==================
 const MP_CONFIG = {
   MAX_PLAYERS: 6,
   TEAM_MAX: 3,
-  TICK_RATE: 20,          // 主機廣播 Hz
-  INPUT_RATE: 30,         // 客戶端發送 Hz
+  TICK_RATE: 20,
+  INPUT_RATE: 30,
   BULLET_SPEED: 12,
   BULLET_DMG: 15,
   BULLET_RADIUS: 5,
   PLAYER_HP: 100,
   PLAYER_RADIUS: 16,
   PLAYER_SPEED: 4.3,
-  FIRE_DELAY: 12,         // 幀
-  MATCH_DURATION: 180000, // 3 分鐘
+  FIRE_DELAY: 12,
+  MATCH_DURATION: 180000,
   WIN_SCORE: 10,
   OBSTACLE_COUNT: 10
 };
 
-// ================== 常駐技能的輔助循環 ==================
 let _auxSkillInterval = null;
 function ensureAuxSkillsLoop() {
   if (_auxSkillInterval) return;
