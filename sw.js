@@ -1,8 +1,8 @@
-const CACHE = "neon-ovd-online-v1";
+const CACHE = "neon-ovd-online-v3"; // 版本號提升
 const FILES = [
-  "./", "./index.html", "./data.js", "./save.js", "./decor.js",
-  "./engine.js", "./gacha.js", "./parry.js", "./systems.js",
-  "./net.js", "./multiplayer.js", "./ui.js", "./main.js", "./manifest.json"
+  "./data.js", "./save.js", "./decor.js", "./engine.js", "./gacha.js", 
+  "./parry.js", "./systems.js", "./net.js", "./multiplayer.js", "./ui.js", "./main.js", "./manifest.json"
+  // 故意不把 index.html 放進去，避免被永久緩存
 ];
 
 self.addEventListener("install", e => {
@@ -16,6 +16,12 @@ self.addEventListener("activate", e => {
   self.clients.claim();
 });
 self.addEventListener("fetch", e => {
+  // 如果是 HTML 請求，強制走網路 (Network First)
+  if (e.request.mode === 'navigate' || e.request.url.includes('.html')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+  // JS 走緩存優先
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).catch(() => r))
   );
