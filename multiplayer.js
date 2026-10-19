@@ -1,6 +1,6 @@
 // ============================================================
 // NEON OVERDRIVE ONLINE // multiplayer.js
-// 多人 / 團隊對戰模式（含場景障礙物、動態 UI 注入）
+// PVE + PVP 混合大亂鬥版
 // ============================================================
 
 const MP = {
@@ -12,17 +12,19 @@ const MP = {
   players: {},
   bullets: [],
   obstacles: [],
+  enemies: [],       // ★ 新增：怪物陣列
   scores: { red: 0, blue: 0 },
   matchStart: 0,
   matchEnd: 0,
   finished: false,
   input: { mx: 0, my: 0, angle: 0, shoot: false },
+  
   _tickTimer: null,
   _inputTimer: null,
   _fireTick: 0,
   _lastSent: 0,
+  _enemySpawnTimer: 0, // ★ 計時器
 
-  // 防呆機制：如果舊版 HTML 沒有大廳 UI，這裡會自動生成
   injectLobbyUI() {
     if (document.getElementById("mp-lobby-overlay")) return;
     const html = `
@@ -30,7 +32,7 @@ const MP = {
       <div class="panel" style="max-width:480px;">
         <button type="button" class="close-x-btn" id="mp-leave-btn">✕</button>
         <h2 style="color:var(--purple);margin-bottom:4px;">🌐 聯機大廳</h2>
-        <p class="sub">免費 P2P 對戰 · 網頁/APK 互通</p>
+        <p class="sub">PVE 怪物生存 + PVP 陣營大亂鬥</p>
         <div id="mp-status" style="font-size:.75rem;color:var(--accent);min-height:16px;margin-bottom:10px;text-align:center;font-family:var(--font-mono);">—</div>
         <div id="mp-mode-select">
           <div class="btn-row">
@@ -78,27 +80,19 @@ const MP = {
     document.body.insertAdjacentHTML('beforeend', html);
   },
 
-  // 負責綁定所有大廳按鈕的事件
   bindDynamicUI() {
-    const bind = (id, fn) => { 
-      const el = document.getElementById(id); 
-      if (el) el.onclick = fn; 
-    };
-    
+    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     bind("mp-leave-btn", () => this.exitLobby());
     bind("mp-leave-btn-2", () => this.exitLobby());
-    
     bind("mp-create-btn", () => {
       document.getElementById("mp-mode-select").classList.add("hidden");
-      this.setStatus("載入聯機模組...");
+      this.setStatus("載入模組...");
       this.hostRoom();
     });
-    
     bind("mp-join-btn", () => {
       document.getElementById("mp-mode-select").classList.add("hidden");
       document.getElementById("mp-join-form").classList.remove("hidden");
     });
-    
     bind("mp-join-confirm-btn", () => {
       const codeEl = document.getElementById("mp-code-input");
       const code = (codeEl?.value || "").trim().toUpperCase();
@@ -106,7 +100,6 @@ const MP = {
       document.getElementById("mp-join-form").classList.add("hidden");
       this.joinRoom(code);
     });
-    
     bind("mp-copy-code-btn", () => {
       const el = document.getElementById("mp-room-code-display");
       if (el) {
@@ -116,22 +109,12 @@ const MP = {
         }).catch(() => alert("請手動複製：" + el.textContent));
       }
     });
-    
     bind("mp-start-btn", () => this.hostStartMatch());
-
-    bind("mp-result-return-btn", () => {
-      document.getElementById("mp-result-overlay")?.classList.add("hidden");
-      document.getElementById("mp-hud")?.classList.add("hidden");
-      document.getElementById("menu-overlay")?.classList.remove("hidden");
-      state = "MENU";
-      syncBodyStateAttr();
-      this.exitLobby();
-    });
   },
 
   enterLobby() {
-    this.injectLobbyUI(); // 確保 UI 存在
-    this.bindDynamicUI(); // ★ 關鍵修復：確保每次打開都綁定事件
+    this.injectLobbyUI();
+    this.bindDynamicUI();
     this.active = false;
     document.getElementById("mp-lobby-overlay")?.classList.remove("hidden");
     this.renderLobbyPlayers();
@@ -144,9 +127,7 @@ const MP = {
 
   exitLobby() {
     Net.disconnect();
-    this.players = {};
-    this.bullets = [];
-    this.obstacles = [];
+    this.players = {}; this.bullets = []; this.obstacles = []; this.enemies = [];
     this.active = false;
     document.getElementById("mp-lobby-overlay")?.classList.add("hidden");
     document.getElementById("mp-hud")?.classList.add("hidden");
@@ -178,11 +159,7 @@ const MP = {
       onError: (e) => this.setStatus("❌ 連線失敗: " + (e?.message || e))
     });
 
-    try {
-      await Net.host();
-    } catch (e) {
-      this.setStatus("❌ 連線失敗: " + (e?.message || e));
-    }
+    try { await Net.host(); } catch (e) { this.setStatus("❌ 連線失敗: " + (e?.message || e)); }
   },
 
   async joinRoom(code) {
@@ -192,39 +169,24 @@ const MP = {
 
     this.setStatus("正在連線...");
     Net.init({
-      onOpen: () => {
-        this.myId = Net.myPeerId;
-        Net.send({ type: "join", name });
-      },
+      onOpen: () => { this.myId = Net.myPeerId; Net.send({ type: "join", name }); },
       onMessage: (data) => this.clientHandleMessage(data),
-      onClose: () => {
-        this.setStatus("房主已離開房間");
-        setTimeout(() => this.exitLobby(), 2000);
-      },
+      onClose: () => { this.setStatus("房主已離開房間"); setTimeout(() => this.exitLobby(), 2000); },
       onError: (e) => this.setStatus("❌ 連線失敗: " + (e?.message || e))
     });
 
-    try {
-      await Net.join(code);
-    } catch (e) {
-      this.setStatus("❌ 連線失敗: " + (e?.message || e));
-    }
+    try { await Net.join(code); } catch (e) { this.setStatus("❌ 連線失敗: " + (e?.message || e)); }
   },
 
   showRoomCode(code) {
-    const el = document.getElementById("mp-room-code-display");
-    if (el) el.textContent = code;
-    const box = document.getElementById("mp-room-code-box");
-    if (box) box.classList.remove("hidden");
-    const hostBtns = document.getElementById("mp-host-controls");
-    if (hostBtns) hostBtns.classList.remove("hidden");
+    const el = document.getElementById("mp-room-code-display"); if (el) el.textContent = code;
+    const box = document.getElementById("mp-room-code-box"); if (box) box.classList.remove("hidden");
+    const hostBtns = document.getElementById("mp-host-controls"); if (hostBtns) hostBtns.classList.remove("hidden");
   },
 
-  setStatus(msg) {
-    const el = document.getElementById("mp-status");
-    if (el) el.textContent = msg;
-  },
+  setStatus(msg) { const el = document.getElementById("mp-status"); if (el) el.textContent = msg; },
 
+  // ============ 主機消息處理 ============
   hostHandleMessage(data, conn) {
     if (!data || typeof data !== "object") return;
 
@@ -232,76 +194,45 @@ const MP = {
       const id = conn.peer;
       const redCount = Object.values(this.players).filter(p => p.team === "red").length;
       const blueCount = Object.values(this.players).filter(p => p.team === "blue").length;
-      let team = redCount <= blueCount ? "red" : "blue";
+      let team = redCount <= blueCount ? "red" : "blue"; // 強制分隊
 
       if (redCount >= MP_CONFIG.TEAM_MAX && blueCount >= MP_CONFIG.TEAM_MAX) {
-        Net.sendTo(conn, { type: "error", msg: "隊伍已滿" });
-        return;
+        Net.sendTo(conn, { type: "error", msg: "隊伍已滿" }); return;
       }
-      this.players[id] = {
-        x: MAP_SIZE / 2 + (Math.random() - 0.5) * 400,
-        y: MAP_SIZE / 2 + (Math.random() - 0.5) * 400,
-        hp: MP_CONFIG.PLAYER_HP, team,
-        angle: 0, alive: true, name: (data.name || "Player").slice(0, 12),
-        lastUpdate: performance.now()
-      };
+      this.players[id] = { x: MAP_SIZE / 2 + (Math.random() - 0.5) * 400, y: MAP_SIZE / 2 + (Math.random() - 0.5) * 400, hp: MP_CONFIG.PLAYER_HP, team, angle: 0, alive: true, name: (data.name || "Player").slice(0, 12), lastUpdate: performance.now() };
       Net.sendTo(conn, { type: "welcome", yourId: id, yourTeam: team });
-      this.broadcastLobbyState();
-      this.renderLobbyPlayers();
+      this.broadcastLobbyState(); this.renderLobbyPlayers();
     } else if (data.type === "input") {
       const p = this.players[conn.peer];
       if (p && this.active) {
-        p.x = Math.max(0, Math.min(MAP_SIZE, data.x));
-        p.y = Math.max(0, Math.min(MAP_SIZE, data.y));
-        p.angle = data.angle || 0;
-        p.lastUpdate = performance.now();
-        if (data.shoot && !p._cooldown) {
-          this.spawnBulletFor(p);
-          p._cooldown = MP_CONFIG.FIRE_DELAY;
-        }
+        p.x = Math.max(0, Math.min(MAP_SIZE, data.x)); p.y = Math.max(0, Math.min(MAP_SIZE, data.y));
+        p.angle = data.angle || 0; p.lastUpdate = performance.now();
+        if (data.shoot && !p._cooldown) { this.spawnBulletFor(p); p._cooldown = MP_CONFIG.FIRE_DELAY; }
       }
     } else if (data.type === "leave") {
-      delete this.players[conn.peer];
-      this.broadcastLobbyState();
-      this.renderLobbyPlayers();
+      delete this.players[conn.peer]; this.broadcastLobbyState(); this.renderLobbyPlayers();
     }
   },
 
   broadcastLobbyState() {
-    const list = Object.entries(this.players).map(([id, p]) => ({
-      id, name: p.name, team: p.team, hp: p.hp
-    }));
+    const list = Object.entries(this.players).map(([id, p]) => ({ id, name: p.name, team: p.team, hp: p.hp }));
     Net.broadcast({ type: "lobby", players: list, scores: this.scores });
   },
 
+  // ============ 客戶端消息處理 ============
   clientHandleMessage(data) {
     if (!data || typeof data !== "object") return;
-
     if (data.type === "welcome") {
-      this.myId = data.yourId;
-      this.myTeam = data.yourTeam;
+      this.myId = data.yourId; this.myTeam = data.yourTeam;
       this.setStatus("準備完成 · " + (this.myTeam === "red" ? "🔴 紅隊" : "🔵 藍隊"));
     } else if (data.type === "lobby") {
       const map = {};
-      data.players.forEach(p => {
-        map[p.id] = {
-          x: (this.players[p.id] || {}).x || MAP_SIZE / 2,
-          y: (this.players[p.id] || {}).y || MAP_SIZE / 2,
-          hp: p.hp, team: p.team, angle: 0, alive: true, name: p.name, lastUpdate: performance.now()
-        };
-      });
-      this.players = map;
-      if (data.scores) this.scores = data.scores;
-      this.renderLobbyPlayers();
+      data.players.forEach(p => { map[p.id] = { x: (this.players[p.id] || {}).x || MAP_SIZE / 2, y: (this.players[p.id] || {}).y || MAP_SIZE / 2, hp: p.hp, team: p.team, angle: 0, alive: true, name: p.name, lastUpdate: performance.now() }; });
+      this.players = map; if (data.scores) this.scores = data.scores; this.renderLobbyPlayers();
     } else if (data.type === "start") {
       this.obstacles = data.obstacles || [];
       this.players = {};
-      data.players.forEach(p => {
-        this.players[p.id] = {
-          x: p.x, y: p.y, hp: p.hp, team: p.team,
-          angle: 0, alive: true, name: p.name, lastUpdate: performance.now()
-        };
-      });
+      data.players.forEach(p => { this.players[p.id] = { x: p.x, y: p.y, hp: p.hp, team: p.team, angle: 0, alive: true, name: p.name, lastUpdate: performance.now() }; });
       this.myTeam = data.teams[this.myId] || "blue";
       this.beginMatch();
     } else if (data.type === "state") {
@@ -309,92 +240,67 @@ const MP = {
         const p = this.players[upd.id];
         if (p) {
           if (upd.id === this.myId) {
-            p.hp = upd.hp;
-            p.alive = upd.alive;
-            if (Math.hypot(p.x - upd.x, p.y - upd.y) > 200) {
-              p.x = upd.x; p.y = upd.y;
-            }
+            p.hp = upd.hp; p.alive = upd.alive;
+            if (Math.hypot(p.x - upd.x, p.y - upd.y) > 200) { p.x = upd.x; p.y = upd.y; }
           } else {
-            p.x += (upd.x - p.x) * 0.35;
-            p.y += (upd.y - p.y) * 0.35;
+            p.x += (upd.x - p.x) * 0.35; p.y += (upd.y - p.y) * 0.35;
             p.hp = upd.hp; p.alive = upd.alive; p.angle = upd.angle;
           }
         }
       });
       this.bullets = data.bullets || [];
+      this.enemies = data.enemies || []; // 接收怪物數據
       if (data.scores) this.scores = data.scores;
       if (data.finished && !this.finished) this.endMatch(data.winner);
       this.updateMPHud();
-    } else if (data.type === "error") {
-      this.setStatus(data.msg || "錯誤");
-    }
+    } else if (data.type === "error") { this.setStatus(data.msg || "錯誤"); }
   },
 
   spawnBulletFor(p) {
     const ang = p.angle || 0;
-    this.bullets.push({
-      x: p.x + Math.cos(ang) * 20,
-      y: p.y + Math.sin(ang) * 20,
-      vx: Math.cos(ang) * MP_CONFIG.BULLET_SPEED,
-      vy: Math.sin(ang) * MP_CONFIG.BULLET_SPEED,
-      owner: p.name, team: p.team,
-      r: MP_CONFIG.BULLET_RADIUS,
-      alive: true
-    });
+    this.bullets.push({ x: p.x + Math.cos(ang) * 20, y: p.y + Math.sin(ang) * 20, vx: Math.cos(ang) * MP_CONFIG.BULLET_SPEED, vy: Math.sin(ang) * MP_CONFIG.BULLET_SPEED, owner: p.name, team: p.team, r: MP_CONFIG.BULLET_RADIUS, alive: true });
   },
 
+  // ============ 主機開始對戰 ============
   hostStartMatch() {
     if (!this.isHost) return;
     if (Object.keys(this.players).length < 1) { alert("至少需要 1 名玩家"); return; }
-
+    
+    // ★ 生成海量障礙物 (60個)
     const obs = [];
-    for (let i = 0; i < MP_CONFIG.OBSTACLE_COUNT; i++) {
-      const r = 50 + Math.random() * 60;
-      let x, y, ok = false, tries = 0;
-      while (!ok && tries++ < 30) {
-        x = 300 + Math.random() * (MAP_SIZE - 600);
-        y = 300 + Math.random() * (MAP_SIZE - 600);
-        if (Math.hypot(x - MAP_SIZE / 2, y - MAP_SIZE / 2) > 400) ok = true;
-        for (const o of obs) {
-          if (Math.hypot(x - o.x, y - o.y) < r + o.r + 40) { ok = false; break; }
-        }
+    let attempts = 0;
+    while (obs.length < 60 && attempts < 1000) {
+      attempts++;
+      const r = 40 + Math.random() * 80; // 大小隨機
+      const x = 300 + Math.random() * (MAP_SIZE - 600);
+      const y = 300 + Math.random() * (MAP_SIZE - 600);
+      
+      // 避免生在中心出生點
+      if (Math.hypot(x - MAP_SIZE / 2, y - MAP_SIZE / 2) < 300) continue;
+      
+      let overlap = false;
+      for (const o of obs) {
+        if (Math.hypot(x - o.x, y - o.y) < r + o.r + 20) { overlap = true; break; }
       }
-      if (ok) obs.push({ x, y, r });
+      if (!overlap) obs.push({ x, y, r });
     }
     this.obstacles = obs;
 
-    const teams = {};
-    const playerList = [];
-    let redIdx = 0, blueIdx = 0;
+    const teams = {}; const playerList = []; let redIdx = 0, blueIdx = 0;
     Object.entries(this.players).forEach(([id, p]) => {
       let sx, sy;
-      if (p.team === "red") {
-        sx = 400 + redIdx * 120;
-        sy = MAP_SIZE / 2 + 400;
-        redIdx++;
-      } else {
-        sx = 400 + blueIdx * 120;
-        sy = MAP_SIZE / 2 - 400;
-        blueIdx++;
-      }
+      if (p.team === "red") { sx = 400 + redIdx * 120; sy = MAP_SIZE / 2 + 400; redIdx++; }
+      else { sx = 400 + blueIdx * 120; sy = MAP_SIZE / 2 - 400; blueIdx++; }
       p.x = sx; p.y = sy; p.hp = MP_CONFIG.PLAYER_HP; p.alive = true;
-      teams[id] = p.team;
-      playerList.push({ id, x: sx, y: sy, hp: p.hp, team: p.team, name: p.name });
+      teams[id] = p.team; playerList.push({ id, x: sx, y: sy, hp: p.hp, team: p.team, name: p.name });
     });
 
-    this.matchStart = Date.now();
-    this.matchEnd = this.matchStart + MP_CONFIG.MATCH_DURATION;
-    this.scores = { red: 0, blue: 0 };
-    this.finished = false;
-    this.bullets = [];
+    this.matchStart = Date.now(); this.matchEnd = this.matchStart + MP_CONFIG.MATCH_DURATION;
+    this.scores = { red: 0, blue: 0 }; this.finished = false; this.bullets = [];
+    this.enemies = []; // 清空怪物
+    this._enemySpawnTimer = 0;
 
-    Net.broadcast({
-      type: "start",
-      obstacles: this.obstacles,
-      players: playerList,
-      teams
-    });
-
+    Net.broadcast({ type: "start", obstacles: this.obstacles, players: playerList, teams });
     this.beginMatch();
   },
 
@@ -405,102 +311,139 @@ const MP = {
     document.getElementById("hud")?.classList.add("hidden");
     document.getElementById("build-fab-wrap")?.classList.add("hidden");
     document.getElementById("active-skills-hud")?.classList.add("hidden");
-
-    state = "PLAY";
-    syncBodyStateAttr();
-
-    if (this.isHost) {
-      this._tickTimer = setInterval(() => this.hostTick(), 1000 / MP_CONFIG.TICK_RATE);
-    }
-    if (!this.isHost) {
-      this._inputTimer = setInterval(() => this.clientSendInput(), 1000 / MP_CONFIG.INPUT_RATE);
-    }
-
-    this.bindInput();
-    this.updateMPHud();
-    this.loopStart = performance.now();
-    this.fireCooldown = 0;
+    state = "PLAY"; syncBodyStateAttr();
+    
+    if (this.isHost) this._tickTimer = setInterval(() => this.hostTick(), 1000 / MP_CONFIG.TICK_RATE);
+    if (!this.isHost) this._inputTimer = setInterval(() => this.clientSendInput(), 1000 / MP_CONFIG.INPUT_RATE);
+    
+    this.bindInput(); this.updateMPHud(); this.loopStart = performance.now(); this.fireCooldown = 0;
   },
 
+  // ============ 主機每幀計算 ============
   hostTick() {
     if (!this.active) return;
     const now = Date.now();
-
     if (now > this.matchEnd && !this.finished) {
-      const winner = this.scores.red > this.scores.blue ? "red"
-                    : this.scores.blue > this.scores.red ? "blue" : "draw";
-      this.finished = true;
-      this.broadcastState(winner);
-      this.endMatch(winner);
-      return;
+      const winner = this.scores.red > this.scores.blue ? "red" : this.scores.blue > this.scores.red ? "blue" : "draw";
+      this.finished = true; this.broadcastState(winner); this.endMatch(winner); return;
     }
 
+    // 1. 處理子彈移動與碰撞
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
       b.x += b.vx; b.y += b.vy;
-      if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) {
-        this.bullets.splice(i, 1); continue;
-      }
       
-      let hitObs = false;
-      for (const o of this.obstacles) {
-        if (Math.hypot(b.x - o.x, b.y - o.y) < o.r + b.r) { hitObs = true; break; }
-      }
-      if (hitObs) { this.bullets.splice(i, 1); continue; }
-
       let hit = false;
-      for (const [id, p] of Object.entries(this.players)) {
-        if (!p.alive || p.team === b.team) continue;
-        if (Math.hypot(b.x - p.x, b.y - p.y) < MP_CONFIG.PLAYER_RADIUS + b.r) {
-          p.hp -= MP_CONFIG.BULLET_DMG;
+      // 撞牆
+      for (const o of this.obstacles) {
+        if (Math.hypot(b.x - o.x, b.y - o.y) < o.r + b.r) { hit = true; break; }
+      }
+      // 撞怪物
+      for (let j = this.enemies.length - 1; j >= 0; j--) {
+        const e = this.enemies[j];
+        if (Math.hypot(b.x - e.x, b.y - e.y) < e.r + b.r) {
+          e.hp -= MP_CONFIG.BULLET_DMG;
           hit = true;
-          if (p.hp <= 0) {
-            p.hp = 0; p.alive = false;
-            this.scores[b.team]++;
-            setTimeout(() => {
-              if (this.players[id] && !this.players[id].alive) {
-                this.players[id].hp = MP_CONFIG.PLAYER_HP;
-                this.players[id].alive = true;
-                this.players[id].x = MAP_SIZE / 2 + (Math.random() - 0.5) * 200;
-                this.players[id].y = MAP_SIZE / 2 + (Math.random() - 0.5) * 200;
-              }
-            }, 2500);
-          }
+          if (e.hp <= 0) { this.scores[b.team] += 1; this.enemies.splice(j, 1); }
           break;
         }
       }
-      if (hit) this.bullets.splice(i, 1);
+      // 撞玩家 (PVP)
+      if (!hit) {
+        for (const [id, p] of Object.entries(this.players)) {
+          if (!p.alive || p.team === b.team) continue;
+          if (Math.hypot(b.x - p.x, b.y - p.y) < MP_CONFIG.PLAYER_RADIUS + b.r + 4) { // 判定稍微放大
+            p.hp -= MP_CONFIG.BULLET_DMG; hit = true;
+            if (p.hp <= 0) {
+              p.hp = 0; p.alive = false; this.scores[b.team]++;
+              setTimeout(() => {
+                if (this.players[id] && !this.players[id].alive) {
+                  this.players[id].hp = MP_CONFIG.PLAYER_HP; this.players[id].alive = true;
+                  this.players[id].x = MAP_SIZE / 2 + (Math.random() - 0.5) * 200;
+                  this.players[id].y = MAP_SIZE / 2 + (Math.random() - 0.5) * 200;
+                }
+              }, 2500);
+            }
+            break;
+          }
+        }
+      }
+
+      if (hit || b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) {
+        this.bullets.splice(i, 1);
+      }
     }
 
-    for (const p of Object.values(this.players)) {
-      if (p._cooldown > 0) p._cooldown--;
+    // 2. 處理怪物移動與傷害
+    this._enemySpawnTimer++;
+    if (this._enemySpawnTimer > 40) { // 每2秒刷一隻怪
+      this._enemySpawnTimer = 0;
+      if (this.enemies.length < 30) { // 場上最多30隻
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 600 + Math.random() * 400;
+        this.enemies.push({
+          id: Date.now() + Math.random(),
+          x: Math.max(50, Math.min(MAP_SIZE - 50, MAP_SIZE / 2 + Math.cos(ang) * dist)),
+          y: Math.max(50, Math.min(MAP_SIZE - 50, MAP_SIZE / 2 + Math.sin(ang) * dist)),
+          hp: 30, maxHp: 30, speed: 2.5, r: 14
+        });
+      }
     }
+
+    for (let j = this.enemies.length - 1; j >= 0; j--) {
+      const e = this.enemies[j];
+      // 找最近的活著玩家
+      let target = null; let minD = 99999;
+      for (const p of Object.values(this.players)) {
+        if (!p.alive) continue;
+        const d = Math.hypot(p.x - e.x, p.y - e.y);
+        if (d < minD) { minD = d; target = p; }
+      }
+      if (target) {
+        const a = Math.atan2(target.y - e.y, target.x - e.x);
+        e.x += Math.cos(a) * e.speed;
+        e.y += Math.sin(a) * e.speed;
+        
+        // 碰到障礙物反彈 (簡單處理)
+        for (const o of this.obstacles) {
+          if (Math.hypot(e.x - o.x, e.y - o.y) < o.r + e.r) {
+            e.x -= Math.cos(a) * e.speed * 2;
+            e.y -= Math.sin(a) * e.speed * 2;
+          }
+        }
+
+        // 咬玩家
+        if (Math.hypot(e.x - target.x, e.y - target.y) < e.r + MP_CONFIG.PLAYER_RADIUS) {
+          target.hp -= 10; e.hp -= 10; // 怪物自爆扣血
+          if (target.hp <= 0) { target.hp = 0; target.alive = false; /* 被怪咬死不扣分 */ }
+          if (e.hp <= 0) this.enemies.splice(j, 1);
+        }
+      }
+    }
+
+    for (const p of Object.values(this.players)) { if (p._cooldown > 0) p._cooldown--; }
 
     if (!this.finished && (this.scores.red >= MP_CONFIG.WIN_SCORE || this.scores.blue >= MP_CONFIG.WIN_SCORE)) {
-      this.finished = true;
-      const winner = this.scores.red >= MP_CONFIG.WIN_SCORE ? "red" : "blue";
-      this.broadcastState(winner);
-      this.endMatch(winner);
-      return;
+      this.finished = true; const winner = this.scores.red >= MP_CONFIG.WIN_SCORE ? "red" : "blue";
+      this.broadcastState(winner); this.endMatch(winner); return;
     }
 
     this.broadcastState();
   },
 
   broadcastState(winner) {
-    const playersUpd = Object.entries(this.players).map(([id, p]) => ({
-      id, x: p.x, y: p.y, hp: p.hp, alive: p.alive, angle: p.angle
-    }));
-    const bulletsUpd = this.bullets.map(b => ({
-      x: b.x, y: b.y, vx: b.vx, vy: b.vy, team: b.team, r: b.r
-    }));
-    Net.broadcast({
-      type: "state",
-      players: playersUpd,
-      bullets: bulletsUpd,
-      scores: this.scores,
-      finished: this.finished,
-      winner
+    const playersUpd = Object.entries(this.players).map(([id, p]) => ({ id, x: p.x, y: p.y, hp: p.hp, alive: p.alive, angle: p.angle }));
+    const bulletsUpd = this.bullets.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, team: b.team, r: b.r }));
+    const enemiesUpd = this.enemies.map(e => ({ x: e.x, y: e.y, hp: e.hp, r: e.r })); // 廣播怪物
+    
+    Net.broadcast({ 
+      type: "state", 
+      players: playersUpd, 
+      bullets: bulletsUpd, 
+      enemies: enemiesUpd,
+      scores: this.scores, 
+      finished: this.finished, 
+      winner 
     });
     this.updateMPHud();
   },
@@ -509,69 +452,39 @@ const MP = {
     if (!this.active || this.isHost) return;
     const me = this.players[this.myId];
     if (!me || !me.alive) return;
-    Net.send({
-      type: "input",
-      x: me.x, y: me.y, angle: me.angle,
-      shoot: this.input.shoot
-    });
-    if (this.input.shoot && this.fireCooldown <= 0) {
-      this.fireCooldown = MP_CONFIG.FIRE_DELAY;
-    }
+    Net.send({ type: "input", x: me.x, y: me.y, angle: me.angle, shoot: this.input.shoot });
+    if (this.input.shoot && this.fireCooldown <= 0) this.fireCooldown = MP_CONFIG.FIRE_DELAY;
   },
 
   bindInput() {
     if (this._inputBound) return;
-    this._inputBound = true;
-    this._keys = {};
-    this._mouseAngle = 0;
-
-    window.addEventListener("keydown", e => {
-      if (!this.active) return;
-      this._keys[e.code] = true;
-      if (e.code === "KeyJ" || e.code === "Space") this.input.shoot = true;
-    });
-    window.addEventListener("keyup", e => {
-      if (!this.active) return;
-      this._keys[e.code] = false;
-      if (e.code === "KeyJ" || e.code === "Space") this.input.shoot = false;
-    });
-
+    this._inputBound = true; this._keys = {}; this._mouseAngle = 0;
+    window.addEventListener("keydown", e => { if (!this.active) return; this._keys[e.code] = true; if (e.code === "KeyJ" || e.code === "Space") this.input.shoot = true; });
+    window.addEventListener("keyup", e => { if (!this.active) return; this._keys[e.code] = false; if (e.code === "KeyJ" || e.code === "Space") this.input.shoot = false; });
     this._touch = { active: false, id: null, sx: 0, sy: 0, dx: 0, dy: 0 };
     const cvs = document.getElementById("gameCanvas");
     if (!cvs) return;
-    
     cvs.addEventListener("touchstart", e => {
       if (!this.active) return;
       for (const t of e.changedTouches) {
-        if (!this._touch.active) {
-          this._touch.active = true;
-          this._touch.id = t.identifier;
-          this._touch.sx = t.clientX; this._touch.sy = t.clientY;
-          this._touch.dx = 0; this._touch.dy = 0;
-        }
+        if (!this._touch.active) { this._touch.active = true; this._touch.id = t.identifier; this._touch.sx = t.clientX; this._touch.sy = t.clientY; this._touch.dx = 0; this._touch.dy = 0; }
       }
     }, { passive: true });
-    
     cvs.addEventListener("touchmove", e => {
       if (!this.active || !this._touch.active) return;
       for (const t of e.changedTouches) {
         if (t.identifier === this._touch.id) {
-          const dx = t.clientX - this._touch.sx;
-          const dy = t.clientY - this._touch.sy;
+          const dx = t.clientX - this._touch.sx, dy = t.clientY - this._touch.sy;
           const d = Math.hypot(dx, dy), maxR = 60;
           this._touch.dx = dx / Math.max(1, d) * Math.min(1, d / maxR);
           this._touch.dy = dy / Math.max(1, d) * Math.min(1, d / maxR);
         }
       }
     }, { passive: true });
-    
     const endT = () => { this._touch.active = false; this._touch.dx = 0; this._touch.dy = 0; };
-    cvs.addEventListener("touchend", endT);
-    cvs.addEventListener("touchcancel", endT);
-
+    cvs.addEventListener("touchend", endT); cvs.addEventListener("touchcancel", endT);
     cvs.addEventListener("mousedown", e => {
-      if (!this.active) return;
-      this.input.shoot = true;
+      if (!this.active) return; this.input.shoot = true;
       const rect = cvs.getBoundingClientRect();
       this._mouseAngle = Math.atan2(e.clientY - rect.top - H / 2, e.clientX - rect.left - W / 2);
     });
@@ -583,13 +496,13 @@ const MP = {
     });
   },
 
+  // ============ 本地玩家移動與碰撞 ============
   stepLocal() {
     if (!this.active) return;
     const me = this.players[this.myId];
     if (!me || !me.alive) return;
-
     if (this.fireCooldown > 0) this.fireCooldown--;
-
+    
     let mx = 0, my = 0;
     if (this._keys?.["KeyW"] || this._keys?.["ArrowUp"]) my -= 1;
     if (this._keys?.["KeyS"] || this._keys?.["ArrowDown"]) my += 1;
@@ -599,31 +512,34 @@ const MP = {
 
     const len = Math.hypot(mx, my);
     if (len > 0) {
-      const nx = mx / Math.max(1, len);
-      const ny = my / Math.max(1, len);
+      const nx = mx / Math.max(1, len), ny = my / Math.max(1, len);
       const spd = MP_CONFIG.PLAYER_SPEED;
       me.x = Math.max(0, Math.min(MAP_SIZE, me.x + nx * spd));
       me.y = Math.max(0, Math.min(MAP_SIZE, me.y + ny * spd));
-      collideObstacles(me, MP_CONFIG.PLAYER_RADIUS);
+      
+      // ★ 關鍵修復：用 MP.obstacles 進行實體碰撞
+      for (const o of this.obstacles) {
+        const d = Math.hypot(me.x - o.x, me.y - o.y);
+        const minD = MP_CONFIG.PLAYER_RADIUS + o.r;
+        if (d < minD && d > 0.01) {
+          const a = Math.atan2(me.y - o.y, me.x - o.x);
+          me.x = o.x + Math.cos(a) * minD;
+          me.y = o.y + Math.sin(a) * minD;
+        }
+      }
+      
       me.x = Math.max(0, Math.min(MAP_SIZE, me.x));
       me.y = Math.max(0, Math.min(MAP_SIZE, me.y));
     }
-
-    me.angle = this._mouseAngle;
-    this.input.angle = me.angle;
-
-    if (this.isHost && this.input.shoot && this.fireCooldown <= 0) {
-      this.spawnBulletFor(me);
-      this.fireCooldown = MP_CONFIG.FIRE_DELAY;
-    }
-
+    
+    me.angle = this._mouseAngle; this.input.angle = me.angle;
+    if (this.isHost && this.input.shoot && this.fireCooldown <= 0) { this.spawnBulletFor(me); this.fireCooldown = MP_CONFIG.FIRE_DELAY; }
     this.input.mx = mx; this.input.my = my;
   },
 
   endMatch(winner) {
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._inputTimer) { clearInterval(this._inputTimer); this._inputTimer = null; }
-
     const overlay = document.getElementById("mp-result-overlay");
     if (overlay) {
       overlay.classList.remove("hidden");
@@ -643,22 +559,13 @@ const MP = {
   updateMPHud() {
     const redScore = document.getElementById("mp-red-score"); if (redScore) redScore.textContent = this.scores.red;
     const blueScore = document.getElementById("mp-blue-score"); if (blueScore) blueScore.textContent = this.scores.blue;
-
     const myHp = document.getElementById("mp-my-hp"); const me = this.players[this.myId];
     if (myHp && me) myHp.textContent = `${Math.ceil(me.hp)}/${MP_CONFIG.PLAYER_HP}`;
-    const myHpBar = document.getElementById("mp-my-hp-bar"); 
-    if (myHpBar && me) myHpBar.style.width = `${Math.max(0, (me.hp / MP_CONFIG.PLAYER_HP) * 100)}%`;
-
+    const myHpBar = document.getElementById("mp-my-hp-bar"); if (myHpBar && me) myHpBar.style.width = `${Math.max(0, (me.hp / MP_CONFIG.PLAYER_HP) * 100)}%`;
     const myTeamEl = document.getElementById("mp-my-team");
-    if (myTeamEl) { 
-      myTeamEl.textContent = this.myTeam === "red" ? "🔴 紅隊" : "🔵 藍隊"; 
-      myTeamEl.style.color = this.myTeam === "red" ? "#ff0055" : "#00aaff"; 
-    }
+    if (myTeamEl) { myTeamEl.textContent = this.myTeam === "red" ? "🔴 紅隊" : "🔵 藍隊"; myTeamEl.style.color = this.myTeam === "red" ? "#ff0055" : "#00aaff"; }
     const timerEl = document.getElementById("mp-timer");
-    if (timerEl) { 
-      const remain = Math.max(0, Math.ceil((this.matchEnd - Date.now()) / 1000)); 
-      timerEl.textContent = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, "0")}`; 
-    }
+    if (timerEl) { const remain = Math.max(0, Math.ceil((this.matchEnd - Date.now()) / 1000)); timerEl.textContent = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, "0")}`; }
   },
 
   renderLobbyPlayers() {
@@ -677,37 +584,50 @@ const MP = {
     ctx.fillStyle = "#04060c"; ctx.fillRect(0, 0, W, H);
     const me = this.players[this.myId];
     if (!me) return;
-
     let camX = Math.max(0, Math.min(MAP_SIZE - W, me.x - W / 2));
     let camY = Math.max(0, Math.min(MAP_SIZE - H, me.y - H / 2));
     if (W >= MAP_SIZE) camX = (MAP_SIZE - W) / 2;
     if (H >= MAP_SIZE) camY = (MAP_SIZE - H) / 2;
-
+    
     ctx.save(); ctx.translate(-camX, -camY);
-
+    
+    // 背景
     ctx.strokeStyle = "rgba(0,243,255,.05)"; ctx.lineWidth = 1; ctx.beginPath();
     for (let x = 0; x <= MAP_SIZE; x += 100) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); }
     for (let y = 0; y <= MAP_SIZE; y += 100) { ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); }
     ctx.stroke();
-
     ctx.strokeStyle = "#ff0055"; ctx.lineWidth = 4; ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
-    ctx.strokeStyle = "rgba(184,41,255,.4)"; ctx.lineWidth = 3; ctx.setLineDash([20, 15]);
-    ctx.beginPath(); ctx.moveTo(0, MAP_SIZE / 2); ctx.lineTo(MAP_SIZE, MAP_SIZE / 2); ctx.stroke(); ctx.setLineDash([]);
 
-    this.obstacles.forEach(o => { 
-      if (window.NeonDecor?.renderObstacle) window.NeonDecor.renderObstacle(ctx, o, !SaveSys.data.settings.neonGlow); 
+    // 障礙物
+    this.obstacles.forEach(o => { if (window.NeonDecor?.renderObstacle) window.NeonDecor.renderObstacle(ctx, o, !SaveSys.data.settings.neonGlow); });
+
+    // ★ 繪製怪物
+    this.enemies.forEach(e => {
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#1a0a2a"; ctx.fill();
+      ctx.strokeStyle = "#ff00aa"; ctx.lineWidth = 2.5; ctx.stroke();
+      // 眼睛
+      ctx.fillStyle = "#ff00aa"; ctx.beginPath(); ctx.arc(-4, -2, 3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(4, -2, 3, 0, Math.PI*2); ctx.fill();
+      // 血條
+      if (e.hp < e.maxHp) {
+        ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(-15, -e.r - 8, 30, 4);
+        ctx.fillStyle = "#ff00aa"; ctx.fillRect(-15, -e.r - 8, 30 * (e.hp / e.maxHp), 4);
+      }
+      ctx.restore();
     });
 
+    // 玩家
     Object.entries(this.players).forEach(([id, p]) => {
       if (id === this.myId) return;
       if (!p.alive) {
-        ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = p.team === "red" ? "#ff0055" : "#00aaff"; 
-        ctx.font = "bold 12px Orbitron, sans-serif"; ctx.textAlign = "center"; 
-        ctx.fillText("☠️ " + (p.name || "Player"), p.x, p.y); ctx.restore(); return;
+        ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = p.team === "red" ? "#ff0055" : "#00aaff"; ctx.font = "bold 12px Orbitron, sans-serif"; ctx.textAlign = "center"; ctx.fillText("☠️ " + (p.name || "Player"), p.x, p.y); ctx.restore(); return;
       }
       if (window.NeonDecor?.renderRemotePlayer) window.NeonDecor.renderRemotePlayer(ctx, p, !SaveSys.data.settings.neonGlow);
     });
 
+    // 自己
     if (me.alive) {
       if (window.NeonDecor?.renderRemotePlayer) {
         ctx.save(); ctx.translate(me.x, me.y); ctx.rotate(me.angle); ctx.scale(1, 0.86);
@@ -716,16 +636,15 @@ const MP = {
         ctx.fillStyle = "#060a14"; ctx.fill();
         ctx.strokeStyle = teamCol; ctx.lineWidth = 2.5; ctx.shadowColor = teamCol; ctx.shadowBlur = 10; ctx.stroke(); ctx.shadowBlur = 0;
         ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.restore();
-        
         ctx.fillStyle = teamCol; ctx.font = "bold 11px Orbitron, sans-serif"; ctx.textAlign = "center"; ctx.fillText(this.myName + " (You)", me.x, me.y - 28);
         const bw = 40; ctx.fillStyle = "rgba(0,0,0,.7)"; ctx.fillRect(me.x - bw / 2, me.y - 24, bw, 5);
         ctx.fillStyle = teamCol; ctx.fillRect(me.x - bw / 2, me.y - 24, bw * (me.hp / MP_CONFIG.PLAYER_HP), 5);
       }
     } else {
-      ctx.save(); ctx.fillStyle = "rgba(255,0,85,.7)"; ctx.font = "bold 16px Orbitron, sans-serif"; ctx.textAlign = "center"; 
-      ctx.fillText("☠️ 重生中...", me.x, me.y - 30); ctx.restore();
+      ctx.save(); ctx.fillStyle = "rgba(255,0,85,.7)"; ctx.font = "bold 16px Orbitron, sans-serif"; ctx.textAlign = "center"; ctx.fillText("☠️ 重生中...", me.x, me.y - 30); ctx.restore();
     }
 
+    // 子彈
     this.bullets.forEach(b => {
       const col = b.team === "red" ? "#ff3366" : "#33aaff";
       ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 12; ctx.fillStyle = col;
@@ -741,9 +660,10 @@ const MP = {
     const size = Math.min(140, W * 0.2); const x0 = 12, y0 = 128; const k = size / MAP_SIZE;
     ctx.save(); ctx.globalAlpha = 0.92; ctx.fillStyle = "rgba(4,6,12,.85)"; ctx.fillRect(x0, y0, size, size);
     ctx.strokeStyle = "rgba(0,243,255,.6)"; ctx.lineWidth = 1.5; ctx.strokeRect(x0, y0, size, size);
-
-    this.obstacles.forEach(o => { ctx.fillStyle = "rgba(255,128,255,.5)"; ctx.beginPath(); ctx.arc(x0 + o.x * k, y0 + o.y * k, Math.max(2, o.r * k), 0, Math.PI * 2); ctx.fill(); });
-
+    
+    this.obstacles.forEach(o => { ctx.fillStyle = "rgba(255,128,255,.3)"; ctx.beginPath(); ctx.arc(x0 + o.x * k, y0 + o.y * k, Math.max(1, o.r * k), 0, Math.PI * 2); ctx.fill(); });
+    this.enemies.forEach(e => { ctx.fillStyle = "#ff00aa"; ctx.beginPath(); ctx.arc(x0 + e.x * k, y0 + e.y * k, 2, 0, Math.PI * 2); ctx.fill(); });
+    
     Object.entries(this.players).forEach(([id, p]) => {
       if (!p.alive) return; ctx.fillStyle = id === this.myId ? "#ffee00" : (p.team === "red" ? "#ff0055" : "#00aaff");
       ctx.beginPath(); ctx.arc(x0 + p.x * k, y0 + p.y * k, id === this.myId ? 4 : 3, 0, Math.PI * 2); ctx.fill();
