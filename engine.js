@@ -1,8 +1,3 @@
-// ============================================================
-// NEON OVERDRIVE ONLINE // engine.js
-// 核心模擬、渲染、輸入
-// ============================================================
-
 let state = "MENU";
 let returnToPause = false;
 let resumePlayOnClose = false;
@@ -140,7 +135,6 @@ function renderBulletShape(c, b) {
 let player = null;
 let bullets = [], enemyBullets = [], missiles = [], enemies = [], gems = [];
 let supplyCrates = [], blackHoles = [], particles = [], floatTexts = [], shockwaves = [], lightningBolts = [], afterimages = [];
-// ★ 多人模式專用（全域共用，讓 multiplayer.js 存取）
 let obstacles = [];
 let score = 0, runCoins = 0, bankedCoins = 0, wave = 1, waveTimer = 0, spawnTimer = 0, crateTimer = 0;
 let screenShake = 0, revivedThisRun = false, doubledThisRun = false;
@@ -541,7 +535,6 @@ function findNearestEnemy(x, y, maxDist = 9999, exclude = null) {
   return best;
 }
 
-// ============ 障礙物碰撞（多人模式） ============
 function collideObstacles(entity, r) {
   if (!obstacles || obstacles.length === 0) return;
   for (const o of obstacles) {
@@ -1032,7 +1025,6 @@ function draw() {
   ctx.fillRect(0, 0, W, H);
   if (state === "MENU" || !player) return;
 
-  // ★ 多人模式：交給 multiplayer.js 專用渲染
   if (typeof MP !== "undefined" && MP.active) {
     MP.draw();
     return;
