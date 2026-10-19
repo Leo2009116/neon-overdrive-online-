@@ -136,6 +136,7 @@
   #scanlines{position:fixed;inset:0;pointer-events:none;z-index:4;background:repeating-linear-gradient(to bottom,rgba(0,243,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
   #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.7) 100%)}
 
+  /* 多人模式 HUD 樣式 */
   #mp-hud{position:fixed;top:0;left:0;right:0;padding:8px 12px;z-index:11;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;gap:8px}
   .mp-hud-box{background:rgba(6,10,20,.92);border:1.5px solid var(--border-subtle);border-radius:10px;padding:6px 12px;pointer-events:auto}
   #mp-score-display{display:flex;gap:16px;align-items:center;font-family:var(--font-cyber);font-weight:900;font-size:1.15rem}
@@ -208,19 +209,21 @@
   </div>
 </div>
 
-<div id="mp-hud" class="hidden">
-  <div class="mp-hud-box" style="display:flex;flex-direction:column;gap:4px;">
+<!-- 聯機 HUD (帶有隱藏按鈕) -->
+<div id="mp-hud" class="hidden" style="transition: all 0.3s ease;">
+  <div id="mp-hud-left" class="mp-hud-box" style="display:flex;flex-direction:column;gap:4px; position:relative;">
     <div id="mp-my-team">🔴 RED</div>
     <div class="bar-wrap" style="width:150px;"><div id="mp-my-hp-bar" style="width:100%;"></div></div>
     <div style="font-size:.7rem;color:var(--text-muted);">HP <span id="mp-my-hp">100/100</span></div>
   </div>
-  <div class="mp-hud-box" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-    <div id="mp-score-display">
+  <div id="mp-hud-right" class="mp-hud-box" style="display:flex;flex-direction:column;align-items:center;gap:2px; position:relative;">
+    <button id="mp-hud-collapse-btn" style="position:absolute; top:-12px; right:-12px; background:rgba(6,10,20,0.9); border:1px solid rgba(0,243,255,0.8); color:#fff; border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer; z-index:20; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,243,255,0.5);">➖</button>
+    <div id="mp-score-display" style="transition: all 0.3s ease;">
       <span id="mp-red-score">0</span>
       <span style="color:var(--text-muted);font-size:.8rem;">VS</span>
       <span id="mp-blue-score">0</span>
     </div>
-    <div id="mp-timer">3:00</div>
+    <div id="mp-timer" style="transition: all 0.3s ease;">3:00</div>
   </div>
 </div>
 
@@ -315,17 +318,19 @@
 
     <div class="btn-row">
       <button type="button" class="action-btn" id="start-btn" data-i18n="btn_deploy">🚀 投放作戰單元</button>
-      <button type="button" class="action-btn btn-pink" id="open-mp-btn-2" onclick="document.getElementById('open-mp-btn').click();" data-i18n="btn_mp">🌐 聯機對戰</button>
+      <!-- 已經刪除 onclick 屬性，防止衝突 -->
+      <button type="button" class="action-btn btn-pink" id="open-mp-btn-2" data-i18n="btn_mp">🌐 聯機對戰</button>
       <button type="button" class="action-btn btn-ad" id="ad-bonus-btn" data-i18n="btn_ad_500">🎬 領取 +500 ₵</button>
     </div>
   </div>
 </div>
 
+<!-- 聯機大廳 UI -->
 <div id="mp-lobby-overlay" class="overlay modal-overlay hidden">
   <div class="panel" style="max-width:480px;">
     <button type="button" class="close-x-btn" id="mp-leave-btn">✕</button>
     <h2 style="color:var(--purple);margin-bottom:4px;" data-i18n="mp_title">🌐 聯機大廳</h2>
-    <p class="sub" data-i18n="mp_sub">免費 P2P 對戰 · 網頁/APK 互通</p>
+    <p class="sub" data-i18n="mp_sub">PVE 怪物生存 + PVP 陣營大亂鬥</p>
     <div id="mp-status" style="font-size:.75rem;color:var(--accent);min-height:16px;margin-bottom:10px;text-align:center;font-family:var(--font-mono);">—</div>
 
     <div id="mp-mode-select">
@@ -361,6 +366,7 @@
   </div>
 </div>
 
+<!-- 聯機結算 UI -->
 <div id="mp-result-overlay" class="overlay modal-overlay hidden">
   <div class="panel" style="max-width:400px;text-align:center;">
     <h1 id="mp-result-title" style="font-size:2rem;">🎉 勝利！</h1>
