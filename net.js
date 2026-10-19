@@ -1,12 +1,7 @@
-// ============================================================
-// NEON OVERDRIVE ONLINE // net.js
-// PeerJS（WebRTC P2P）免費聯機封裝
-// ============================================================
-
 const Net = {
   peer: null,
-  conns: [],          // 主機端維護多條連線
-  hostConn: null,     // 客戶端連到主機的連線
+  conns: [],
+  hostConn: null,
   isHost: false,
   roomCode: "",
   myPeerId: "",
@@ -16,13 +11,10 @@ const Net = {
 
   async loadPeerJS() {
     if (this.loaded || window.Peer) { this.loaded = true; return; }
-    
-    // 優先使用 jsdelivr，備用 unpkg (提升亞洲地區載入成功率)
     const cdns = [
       "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js",
       "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
     ];
-
     for (let url of cdns) {
       try {
         await new Promise((resolve, reject) => {
@@ -33,7 +25,7 @@ const Net = {
           s.onerror = () => reject(new Error("CDN load fail: " + url));
           document.head.appendChild(s);
         });
-        if (window.Peer) return; // 加載成功直接返回
+        if (window.Peer) return;
       } catch (e) {
         console.warn("[Net] CDN 載入失敗，嘗試下一個...", e);
       }
@@ -41,7 +33,6 @@ const Net = {
     throw new Error("所有 PeerJS CDN 載入失敗，請檢查網路連線");
   },
 
-  // 統一的 Peer 設定檔（加入 STUN 穿透）
   getPeerOptions() {
     return {
       debug: 0,
@@ -50,8 +41,7 @@ const Net = {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' }
+          { urls: 'stun:stun3.l.google.com:19302' }
         ]
       }
     };
@@ -76,10 +66,17 @@ const Net = {
     const fullId = this.PEER_PREFIX + code;
 
     return new Promise((resolve, reject) => {
-      // 使用包含 STUN 的設定
       this.peer = new Peer(fullId, this.getPeerOptions());
       
+      const timeout = setTimeout(() => {
+        if (!this.peer.open) {
+          this.peer.destroy();
+          reject(new Error("連線超時，PeerJS 伺服器可能被封鎖 (香港網路常見)。請嘗試開啟 VPN 或使用自建伺服器。"));
+        }
+      }, 10000);
+
       this.peer.on("open", id => {
+        clearTimeout(timeout);
         this.myPeerId = id;
         if (this.handlers.onOpen) this.handlers.onOpen(code);
         resolve(code);
@@ -91,6 +88,7 @@ const Net = {
       });
       
       this.peer.on("error", e => {
+        clearTimeout(timeout);
         if (this.handlers.onError) this.handlers.onError(e);
         reject(e);
       });
@@ -103,10 +101,17 @@ const Net = {
     this.roomCode = code.toUpperCase().trim();
 
     return new Promise((resolve, reject) => {
-      // 使用包含 STUN 的設定
       this.peer = new Peer(undefined, this.getPeerOptions());
       
+      const timeout = setTimeout(() => {
+        if (!this.peer.open) {
+          this.peer.destroy();
+          reject(new Error("連線超時，PeerJS 伺服器可能被封鎖。請嘗試開啟 VPN。"));
+        }
+      }, 10000);
+
       this.peer.on("open", id => {
+        clearTimeout(timeout);
         this.myPeerId = id;
         const conn = this.peer.connect(this.PEER_PREFIX + this.roomCode, { reliable: true });
         this.hostConn = conn;
@@ -124,6 +129,7 @@ const Net = {
       });
       
       this.peer.on("error", e => {
+        clearTimeout(timeout);
         if (this.handlers.onError) this.handlers.onError(e);
         reject(e);
       });
@@ -148,30 +154,23 @@ const Net = {
     });
   },
 
-  // 主機廣播給所有客戶端
   broadcast(msg) {
     this.conns.forEach(c => {
       try { if (c.open) c.send(msg); } catch (e) {}
     });
   },
 
-  // 客戶端發送給主機
   send(msg) {
     try { if (this.hostConn && this.hostConn.open) this.hostConn.send(msg); } catch (e) {}
   },
 
-  // 主機回覆特定客戶端
   sendTo(conn, msg) {
     try { if (conn && conn.open) conn.send(msg); } catch (e) {}
   },
 
   disconnect() {
-    try {
-      if (this.hostConn) this.hostConn.close();
-    } catch (e) {}
-    try {
-      if (this.peer) this.peer.destroy();
-    } catch (e) {}
+    try { if (this.hostConn) this.hostConn.close(); } catch (e) {}
+    try { if (this.peer) this.peer.destroy(); } catch (e) {}
     this.peer = null;
     this.conns = [];
     this.hostConn = null;
