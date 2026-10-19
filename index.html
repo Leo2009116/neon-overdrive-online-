@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>NEON OVERDRIVE ONLINE</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg-main:#04060c; --bg-panel:rgba(6,10,20,.95); --bg-card:rgba(12,18,34,.9);
+    --border-subtle:rgba(0,243,255,.35); --border-focus:#00f3ff;
+    --accent:#00f3ff; --accent-hover:#00bcd4;
+    --neon-pink:#ff007f; --neon-purple:#b829ff;
+    --success:#00ff9d; --warning:#ffee00; --danger:#ff0055; --purple:#b829ff;
+    --text-main:#f0f8ff; --text-muted:#7dd3fc;
+    --font-cyber:'Orbitron','Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    --font-ui:'Rajdhani','Orbitron','Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+    --font-mono:'Share Tech Mono',monospace;
+  }
+  *{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  body,html{width:100%;height:100%;overflow:hidden;background:var(--bg-main);font-family:var(--font-ui);color:var(--text-main);touch-action:none;-webkit-font-smoothing:antialiased}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:rgba(4,6,12,.92);z-index:20;padding:16px;overflow-y:auto}
+  .modal-overlay{justify-content:center;background:rgba(3,5,10,.88);z-index:45}
+  .hidden{display:none!important}
+  .panel{background:var(--bg-panel);border:1.5px solid var(--border-subtle);border-radius:14px;padding:18px 20px;width:100%;max-width:720px;box-shadow:0 0 24px rgba(0,243,255,.12),0 12px 32px rgba(0,0,0,.8);margin:auto;position:relative}
+  .close-x-btn{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:8px;background:rgba(255,0,85,.14);border:1.5px solid rgba(255,0,85,.55);color:#ff4d88;font-size:1.05rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
+  .close-x-btn:hover{background:var(--danger);color:#fff}
+  .top-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-subtle)}
+  .top-bar-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  h1{font-size:clamp(1.35rem,3.8vw,2rem);font-weight:900;letter-spacing:2px;color:var(--accent);line-height:1.1;text-shadow:0 0 10px rgba(0,243,255,.8),0 0 26px rgba(0,243,255,.35);font-family:var(--font-cyber)}
+  h2,h3,h4{font-family:var(--font-cyber);letter-spacing:1px}
+  .sub{color:var(--text-muted);font-size:.78rem;margin-bottom:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:8px 0 12px}
+  .card{background:var(--bg-card);border:1.5px solid var(--border-subtle);border-radius:10px;padding:10px;display:flex;flex-direction:column;justify-content:space-between;position:relative;cursor:pointer;text-align:left;color:var(--text-main);font-family:inherit;width:100%;transition:.15s}
+  .card:hover{border-color:var(--accent);background:rgba(15,23,42,.95);box-shadow:0 0 16px rgba(0,243,255,.35)}
+  .card h3{font-size:.86rem;margin-bottom:2px;color:#fff}
+  .card p{font-size:.72rem;color:var(--text-muted);margin-bottom:6px;line-height:1.25}
+  .card .price{font-weight:800;color:var(--warning);font-size:.84rem;font-family:var(--font-cyber)}
+  .card .tag{position:absolute;top:8px;right:8px;font-size:.65rem;background:rgba(0,243,255,.14);color:var(--accent);padding:2px 6px;border-radius:99px;font-weight:700;border:1px solid rgba(0,243,255,.35);font-family:var(--font-cyber)}
+  .skin-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;scrollbar-width:thin}
+  .skin-chip{flex:0 0 auto;padding:5px 10px;border-radius:99px;background:var(--bg-card);border:1.5px solid var(--border-subtle);font-size:.74rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--text-main);font-family:inherit}
+  .skin-chip.selected{border-color:var(--success);background:rgba(0,255,157,.14);color:#fff;box-shadow:0 0 12px rgba(0,255,157,.5)}
+  .skin-chip.locked{opacity:.5;cursor:not-allowed}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  button.action-btn{appearance:none;border:1.5px solid rgba(0,243,255,.5);border-radius:10px;padding:10px 16px;font-size:.88rem;font-weight:800;cursor:pointer;color:#04060c;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1;min-width:125px;font-family:inherit;box-shadow:0 0 14px rgba(0,243,255,.45);transition:.15s}
+  button.action-btn:hover{filter:brightness(1.12);box-shadow:0 0 22px rgba(0,243,255,.75)}
+  button.btn-secondary{background:rgba(15,23,42,.9);color:var(--text-main);border:1.5px solid var(--border-subtle);box-shadow:none}
+  button.btn-ad{background:var(--warning);color:#04060c;border-color:#fef08a;box-shadow:0 0 14px rgba(255,238,0,.45)}
+  button.btn-purple{background:var(--purple);color:#fff;border-color:#e879f9;box-shadow:0 0 14px rgba(184,41,255,.5)}
+  button.btn-success{background:var(--success);color:#04060c;border-color:#a7f3d0;box-shadow:0 0 14px rgba(0,255,157,.45)}
+  button.btn-danger{background:var(--danger);color:#fff;border-color:#fda4af;box-shadow:0 0 14px rgba(255,0,85,.5)}
+  button.btn-pink{background:var(--neon-pink);color:#fff;border-color:#ff80bf;box-shadow:0 0 14px rgba(255,0,127,.55)}
+  .icon-btn{background:var(--bg-card);border:1.5px solid var(--border-subtle);color:var(--text-main);padding:5px 9px;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+  .icon-btn:hover{border-color:var(--accent);color:#fff;box-shadow:0 0 10px rgba(0,243,255,.5)}
+  #hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10;gap:8px}
+  .hud-group{display:flex;flex-direction:column;gap:5px;background:rgba(6,10,20,.88);padding:7px 11px;border-radius:10px;border:1.5px solid var(--border-subtle);pointer-events:auto;box-shadow:0 0 14px rgba(0,243,255,.15)}
+  .hud-top-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .bar-wrap{width:145px;height:9px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;border:1px solid rgba(0,243,255,.25)}
+  .bar-fill{height:100%;width:100%;transition:width .12s linear}
+  #hp-bar{background:var(--success);box-shadow:0 0 8px var(--success)}
+  #shield-bar{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  #xp-bar{background:var(--purple);box-shadow:0 0 8px var(--purple)}
+  .stat-pill{font-size:.78rem;font-weight:800;display:flex;align-items:center;gap:5px;font-family:var(--font-cyber)}
+  .gold-text{color:var(--warning);text-shadow:0 0 8px rgba(255,238,0,.6)}
+  .fps-pill{font-size:.72rem;font-weight:900;color:var(--success);border:1px solid rgba(0,255,157,.4);padding:3px 7px;border-radius:6px;background:rgba(0,255,157,.08);font-family:var(--font-mono)}
+  #boss-hud{position:fixed;top:68px;left:50%;transform:translateX(-50%);width:min(440px,88vw);background:rgba(6,10,20,.92);border:1.5px solid var(--danger);border-radius:10px;padding:6px 12px;z-index:11;pointer-events:none;text-align:center;box-shadow:0 0 20px rgba(255,0,85,.5)}
+  #boss-hud .b-title{font-size:.74rem;font-weight:900;color:var(--danger);letter-spacing:1.5px;margin-bottom:4px;font-family:var(--font-cyber)}
+  #boss-bar-wrap{width:100%;height:9px;background:rgba(255,0,85,.15);border-radius:99px;overflow:hidden}
+  #boss-bar{width:100%;height:100%;background:var(--danger);transition:width .1s linear;box-shadow:0 0 10px var(--danger)}
+
+  #build-fab-wrap{position:fixed;left:16px;bottom:16px;z-index:14;pointer-events:auto}
+  #build-fab{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(0,243,255,.35),rgba(6,10,20,.95));border:2px solid var(--accent);color:#fff;font-size:1.35rem;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(0,243,255,.6);font-family:inherit}
+  #build-fab .fab-coins{position:absolute;bottom:-8px;right:-8px;background:#04060c;border:1.5px solid var(--warning);color:var(--warning);font-size:.6rem;font-weight:900;padding:1px 6px;border-radius:99px;min-width:34px;text-align:center;font-family:var(--font-cyber)}
+  #build-radial{position:fixed;left:46px;bottom:46px;width:0;height:0;z-index:15;pointer-events:none}
+  #build-radial.open{pointer-events:auto}
+  .radial-slot{position:absolute;left:0;top:0;width:62px;height:62px;border-radius:14px;background:rgba(6,10,20,.96);border:1.5px solid var(--border-subtle);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;font-family:inherit;opacity:0;transform-origin:center;transition:opacity .16s,transform .16s,box-shadow .16s;box-shadow:0 0 12px rgba(0,243,255,.25)}
+  #build-radial.open .radial-slot{opacity:1}
+  .radial-slot .r-icon{font-size:1.05rem;line-height:1}
+  .radial-slot .r-name{font-size:.56rem;font-weight:800;color:var(--text-muted)}
+  .radial-slot .r-cost{font-size:.54rem;color:var(--warning);font-weight:900;font-family:var(--font-cyber)}
+  .radial-slot.selected{border-color:var(--success);background:rgba(0,255,157,.2);box-shadow:0 0 18px rgba(0,255,157,.8)}
+
+  #active-skills-hud{position:fixed;bottom:18px;right:16px;display:flex;flex-direction:column;gap:10px;z-index:12;pointer-events:auto}
+  .skill-btn{width:56px;height:56px;border-radius:50%;background:rgba(6,10,20,.92);border:2px solid var(--accent);color:#fff;font-weight:900;font-size:.62rem;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;font-family:var(--font-cyber);box-shadow:0 0 14px rgba(0,243,255,.4)}
+  .skill-btn.nova{border-color:var(--neon-pink);box-shadow:0 0 14px rgba(255,0,127,.5)}
+  .skill-btn.parry{border-color:var(--warning);box-shadow:0 0 14px rgba(255,238,0,.5)}
+  .skill-btn.afk-active{border-color:var(--success);width:48px;height:48px;align-self:flex-end}
+  .skill-btn.afk-active.afk-on{background:rgba(0,255,157,.25)}
+  .skill-btn.on-cd{opacity:.5;border-color:var(--border-subtle);box-shadow:none}
+  .skill-cd-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.72);height:0%;transition:height .1s linear;pointer-events:none}
+
+  #teleport-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(3,5,10,.72);backdrop-filter:blur(3px)}
+  .tp-panel{background:rgba(6,10,20,.97);border:2px solid var(--neon-purple);border-radius:16px;padding:16px;width:min(360px,92vw);box-shadow:0 0 34px rgba(184,41,255,.55);position:relative}
+  .tp-head{color:var(--neon-purple);font-weight:900;font-size:.95rem;letter-spacing:1px;text-align:center;text-shadow:0 0 12px rgba(184,41,255,.8);font-family:var(--font-cyber)}
+  .tp-sub{color:var(--text-muted);font-size:.7rem;text-align:center;margin:4px 0 12px}
+  .tp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .tp-cell{aspect-ratio:1/1;border-radius:10px;background:rgba(12,18,34,.95);border:1.5px solid var(--border-subtle);color:var(--text-main);font-weight:900;font-size:.82rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:var(--font-cyber);transition:.12s}
+  .tp-cell:hover{border-color:var(--neon-purple);box-shadow:0 0 16px rgba(184,41,255,.7);transform:scale(1.04)}
+  .tp-cell small{font-size:.55rem;color:var(--text-muted);font-weight:700;font-family:var(--font-ui)}
+  .tp-cell.self{border-color:var(--accent);box-shadow:0 0 16px rgba(0,243,255,.7)}
+  .tp-close{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:8px;background:rgba(255,0,85,.16);border:1.5px solid rgba(255,0,85,.6);color:#ff4d88;font-weight:900;cursor:pointer}
+
+  .diy-tabs{display:flex;gap:6px;margin-bottom:12px}
+  .diy-tab{flex:1;padding:8px;border-radius:8px;background:var(--bg-card);border:1.5px solid var(--border-subtle);color:var(--text-muted);font-weight:800;font-size:.8rem;cursor:pointer;text-align:center}
+  .diy-tab.active{border-color:var(--accent);color:#fff;background:rgba(0,243,255,.15);box-shadow:0 0 14px rgba(0,243,255,.4)}
+  #god-panel{position:fixed;top:68px;left:14px;background:rgba(6,10,20,.96);border:1.5px solid var(--warning);border-radius:12px;padding:10px;z-index:30;width:244px;pointer-events:auto;max-height:78vh;overflow-y:auto;box-shadow:0 0 22px rgba(255,238,0,.4)}
+  #god-panel h4{color:var(--warning);font-size:.78rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+  .god-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:.72rem}
+  .god-toggle{padding:3px 8px;border-radius:6px;border:1px solid var(--border-subtle);background:var(--bg-card);color:var(--text-muted);font-weight:800;cursor:pointer;font-size:.68rem;font-family:var(--font-cyber)}
+  .god-toggle.active{background:var(--warning);color:#04060c;border-color:#fff}
+  #god-penalty-banner{position:fixed;top:42px;left:50%;transform:translateX(-50%);background:rgba(255,0,85,.9);color:#fff;font-size:.7rem;font-weight:800;padding:3px 12px;border-radius:99px;z-index:25;pointer-events:none;box-shadow:0 0 16px rgba(255,0,85,.8)}
+  #ach-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-130%);background:rgba(6,10,20,.96);border:2px solid var(--warning);border-radius:10px;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:95;transition:transform .3s ease;pointer-events:none;box-shadow:0 0 22px rgba(255,238,0,.6)}
+  #ach-toast.show{transform:translateX(-50%) translateY(0)}
+  .ach-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;max-height:50vh;overflow-y:auto;margin:10px 0;padding-right:4px}
+  .ach-item{background:var(--bg-card);border:1.5px solid var(--border-subtle);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px;opacity:.48}
+  .ach-item.unlocked{opacity:1;border-color:var(--warning);background:rgba(255,238,0,.08);box-shadow:0 0 14px rgba(255,238,0,.25)}
+  .ach-icon{font-size:1.4rem}
+  .gacha-box{text-align:center;padding:14px;background:rgba(0,0,0,.35);border-radius:10px;margin:10px 0;border:1px dashed var(--border-subtle)}
+  .gacha-results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin-top:10px;max-height:210px;overflow-y:auto}
+  .gacha-item{padding:8px;border-radius:8px;background:var(--bg-card);border:1.5px solid var(--border-subtle);font-size:.76rem;font-weight:700;text-align:center}
+  .rarity-SSR{border-color:var(--warning);color:var(--warning);box-shadow:0 0 12px rgba(255,238,0,.4)}
+  .rarity-UR{border-color:var(--neon-pink);color:#ff80bf;box-shadow:0 0 14px rgba(255,0,127,.6)}
+  .rarity-SR{border-color:var(--purple);color:#d8b4fe}
+  .rarity-R{border-color:var(--accent);color:var(--text-muted)}
+  .help-list{text-align:left;font-size:.8rem;color:var(--text-muted);line-height:1.55;margin:8px 0 14px;display:flex;flex-direction:column;gap:6px}
+  .setting-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:7px}
+  .afk-active-pill{border-color:var(--success)!important;color:var(--success)!important}
+  #ad-overlay{z-index:100;background:rgba(3,5,10,.96);justify-content:center}
+  .spinner{width:40px;height:40px;border:3.5px solid rgba(0,243,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #scanlines{position:fixed;inset:0;pointer-events:none;z-index:4;background:repeating-linear-gradient(to bottom,rgba(0,243,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.7) 100%)}
+
+  /* ===== 多人模式 HUD ===== */
+  #mp-hud{position:fixed;top:0;left:0;right:0;padding:8px 12px;z-index:11;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;gap:8px}
+  .mp-hud-box{background:rgba(6,10,20,.92);border:1.5px solid var(--border-subtle);border-radius:10px;padding:6px 12px;pointer-events:auto}
+  #mp-score-display{display:flex;gap:16px;align-items:center;font-family:var(--font-cyber);font-weight:900;font-size:1.15rem}
+  #mp-red-score{color:#ff0055;text-shadow:0 0 10px rgba(255,0,85,.7)}
+  #mp-blue-score{color:#00aaff;text-shadow:0 0 10px rgba(0,170,255,.7)}
+  #mp-timer{font-family:var(--font-mono);font-size:.95rem;color:var(--warning);font-weight:900}
+  #mp-my-team{font-family:var(--font-cyber);font-weight:900;font-size:.85rem}
+  #mp-my-hp-bar{height:100%;background:var(--success);transition:width .15s linear}
+
+  @media (orientation:portrait){
+    #hud{padding:6px 8px}
+    .hud-group{padding:5px 8px}
+    .hud-group .bar-wrap{width:90px}
+    .hud-top-right{gap:4px}
+    .hud-top-right .icon-btn{padding:3px 5px;font-size:.6rem}
+    .stat-pill{font-size:.7rem}
+    #boss-hud{top:60px;width:92vw}
+    #active-skills-hud{bottom:8px;right:6px;flex-direction:row;gap:6px}
+    .skill-btn{width:48px;height:48px;font-size:.54rem}
+    .skill-btn.afk-active{width:40px;height:40px}
+    #build-fab-wrap{left:10px;bottom:10px}
+    #build-fab{width:52px;height:52px;font-size:1.15rem}
+    #build-radial{left:36px;bottom:36px}
+    .radial-slot{width:54px;height:54px}
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .panel{padding:12px 14px}
+    .top-bar-actions{gap:4px}
+    .top-bar-actions .icon-btn{padding:3px 6px;font-size:.68rem}
+  }
+</style>
+</head>
+<body data-state="MENU">
+
+<canvas id="gameCanvas"></canvas>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+
+<div id="ach-toast">
+  <div class="ach-icon" id="ach-toast-icon">🏆</div>
+  <div>
+    <div style="font-size:.68rem;color:var(--warning);font-weight:800;font-family:var(--font-cyber);">ACHIEVEMENT UNLOCKED</div>
+    <div style="font-size:.88rem;font-weight:800;color:#fff;" id="ach-toast-title">First Blood</div>
+  </div>
+</div>
+
+<div id="god-penalty-banner" class="hidden" data-i18n="god_banner">⚠️ 測試模式：紀錄與成就暫停</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-group">
+    <div class="stat-pill"><span data-i18n="hud_hull">HP</span> <span id="hp-text">100/100</span></div>
+    <div class="bar-wrap"><div id="hp-bar" class="bar-fill"></div></div>
+    <div class="stat-pill" style="color:#38bdf8;"><span data-i18n="hud_shield">SHD</span> <span id="shield-text">0/0</span></div>
+    <div class="bar-wrap"><div id="shield-bar" class="bar-fill" style="width:0%;"></div></div>
+    <div class="stat-pill"><span data-i18n="hud_lvl">LV</span> <span id="lvl-text">1</span></div>
+    <div class="bar-wrap"><div id="xp-bar" class="bar-fill" style="width:0%;"></div></div>
+  </div>
+  <div class="hud-group" style="align-items:flex-end;">
+    <div class="hud-top-right">
+      <span class="fps-pill"><span id="fps-txt">60</span> FPS</span>
+      <button type="button" class="icon-btn" id="hud-afk-btn">🤖 AFK: OFF</button>
+      <button type="button" class="icon-btn" id="hud-diy-btn">🎨 DIY</button>
+      <button type="button" class="icon-btn hidden" id="hud-god-btn" style="border-color:var(--warning);color:var(--warning);">⚡ GOD</button>
+      <button type="button" class="icon-btn" id="hud-fullscreen-btn" title="全屏">⛶</button>
+      <button type="button" class="icon-btn" id="hud-settings-btn">⚙️</button>
+      <button type="button" class="icon-btn" id="hud-exit-btn" style="border-color:rgba(255,0,85,.6);color:#ff4d88;" data-i18n="hud_pause">⏸ 暫停</button>
+    </div>
+    <div class="stat-pill" style="margin-top:2px;"><span data-i18n="hud_wave">WAVE</span> <span id="wave-text" style="color:var(--accent);">1</span></div>
+    <div class="stat-pill"><span data-i18n="hud_score">SCORE</span> <span id="score-text">0</span></div>
+    <div class="stat-pill gold-text">₵ <span id="coin-text">0</span></div>
+  </div>
+</div>
+
+<!-- 多人模式 HUD -->
+<div id="mp-hud" class="hidden">
+  <div class="mp-hud-box" style="display:flex;flex-direction:column;gap:4px;">
+    <div id="mp-my-team">🔴 RED</div>
+    <div class="bar-wrap" style="width:150px;"><div id="mp-my-hp-bar" style="width:100%;"></div></div>
+    <div style="font-size:.7rem;color:var(--text-muted);">HP <span id="mp-my-hp">100/100</span></div>
+  </div>
+  <div class="mp-hud-box" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+    <div id="mp-score-display">
+      <span id="mp-red-score">0</span>
+      <span style="color:var(--text-muted);font-size:.8rem;">VS</span>
+      <span id="mp-blue-score">0</span>
+    </div>
+    <div id="mp-timer">3:00</div>
+  </div>
+</div>
+
+<div id="boss-hud" class="hidden">
+  <div class="b-title" id="boss-name-txt">⚠️ DREADNOUGHT BOSS ⚠️</div>
+  <div id="boss-bar-wrap"><div id="boss-bar"></div></div>
+</div>
+
+<div id="build-fab-wrap" class="hidden">
+  <button type="button" id="build-fab" title="長按 / 點擊展開建築">🏗️<span class="fab-coins" id="build-coins-txt">100</span></button>
+</div>
+<div id="build-radial" class="hidden"></div>
+
+<div id="god-panel" class="hidden">
+  <h4><span>⚡ GOD CONSOLE</span><button type="button" class="icon-btn" id="god-close-btn" style="padding:2px 6px;">✕</button></h4>
+  <div id="god-auth-badge" style="font-size:.66rem;color:var(--danger);margin-bottom:6px;">🔒 未授權：不計紀錄</div>
+  <div class="god-row"><span>無敵模式</span><button type="button" class="god-toggle" id="god-inv-btn">OFF</button></div>
+  <div class="god-row"><span>一擊必殺</span><button type="button" class="god-toggle" id="god-ohk-btn">OFF</button></div>
+  <div class="god-row"><span>技能零冷卻</span><button type="button" class="god-toggle" id="god-cd-btn">OFF</button></div>
+  <div class="god-row"><span>全圖吸寶石</span><button type="button" class="god-toggle" id="god-mag-btn">OFF</button></div>
+  <div class="god-row"><span>遊戲速度</span><button type="button" class="god-toggle" id="god-spd-btn">1x</button></div>
+  <div class="god-row"><span>刷怪倍率</span><button type="button" class="god-toggle" id="god-spw-btn">1x</button></div>
+  <div style="height:1px;background:rgba(255,238,0,.3);margin:8px 0;"></div>
+  <div style="font-size:.66rem;color:var(--warning);font-weight:800;margin-bottom:5px;">💰 資源控制</div>
+  <div class="god-row"><span>無限星幣</span><button type="button" class="god-toggle" id="god-infcoin-btn">OFF</button></div>
+  <div class="god-row"><span>無限建造幣</span><button type="button" class="god-toggle" id="god-bc-inf-btn">OFF</button></div>
+  <div class="god-row"><span>建造幣 +1000</span><button type="button" class="god-toggle" id="god-bc-add-btn">+1000</button></div>
+  <div style="height:1px;background:rgba(255,238,0,.3);margin:8px 0;"></div>
+  <div style="font-size:.66rem;color:var(--warning);font-weight:800;margin-bottom:5px;">🎰 抽獎控制</div>
+  <div class="god-row"><span>幸運倍率</span><button type="button" class="god-toggle" id="god-luck-btn">1x</button></div>
+  <div class="god-row"><span>必出未解鎖機體</span><button type="button" class="god-toggle" id="god-gacha-guarantee-btn">OFF</button></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">
+    <button type="button" class="icon-btn" id="god-unlock-all-btn" style="justify-content:center;grid-column:1/-1;color:var(--neon-pink);border-color:var(--neon-pink);">解鎖全部機體</button>
+    <button type="button" class="icon-btn" id="god-coin-btn" style="justify-content:center;color:var(--warning);border-color:var(--warning);">+10萬星幣</button>
+    <button type="button" class="icon-btn" id="god-lvl-btn" style="justify-content:center;">+1 升級</button>
+    <button type="button" class="icon-btn" id="god-boss-btn" style="justify-content:center;">召喚BOSS</button>
+    <button type="button" class="icon-btn" id="god-nuke-btn" style="justify-content:center;">清場秒殺</button>
+  </div>
+</div>
+
+<div id="active-skills-hud" class="hidden">
+  <button type="button" class="skill-btn afk-active" id="afk-Quick-btn"><span>🤖</span><span style="font-size:.5rem;">AUTO</span></button>
+  <button type="button" class="skill-btn parry" id="parry-btn"><div class="skill-cd-overlay" id="parry-cd-fill"></div><span>🛡️</span><span>PARRY</span></button>
+  <button type="button" class="skill-btn nova" id="nova-btn"><div class="skill-cd-overlay" id="nova-cd-fill"></div><span>💥</span><span>NOVA</span></button>
+  <button type="button" class="skill-btn" id="dash-btn"><div class="skill-cd-overlay" id="dash-cd-fill"></div><span>📡</span><span>WARP</span></button>
+</div>
+
+<div id="teleport-overlay" class="hidden">
+  <div class="tp-panel">
+    <button type="button" class="tp-close" id="tp-close-btn">✕</button>
+    <div class="tp-head">📡 座標傳送 // GRID WARP</div>
+    <div class="tp-sub">選擇 Xi + Zj 星區座標進行相位跳躍</div>
+    <div class="tp-grid" id="tp-grid"></div>
+  </div>
+</div>
+
+<!-- ==================== 主選單 ==================== -->
+<div id="menu-overlay" class="overlay">
+  <div class="panel">
+    <div class="top-bar">
+      <div>
+        <h1 id="game-title-el">NEON OVERDRIVE ONLINE</h1>
+        <p class="sub" style="margin-bottom:0;" data-i18n="sub_title">2.5D 霓虹星區建造 × DIY 彈幕生存 × 多人團隊對戰</p>
+      </div>
+      <div class="top-bar-actions">
+        <button type="button" class="icon-btn" id="account-btn">👤 <span id="account-name-txt" data-i18n="btn_account">[存檔]</span></button>
+        <button type="button" class="icon-btn" id="open-diy-btn" style="border-color:var(--accent);color:var(--accent);">🎨 DIY</button>
+        <button type="button" class="icon-btn" id="open-afk-btn" style="border-color:var(--success);color:var(--success);">💤 AFK (<span id="afk-menu-badge">0</span>)</button>
+        <button type="button" class="icon-btn" id="open-gacha-btn" style="border-color:var(--neon-pink);color:#ff80bf;">🎰 抽獎</button>
+        <button type="button" class="icon-btn" id="open-mp-btn" style="border-color:var(--purple);color:#d8b4fe;" data-i18n="btn_mp">🌐 聯機</button>
+        <button type="button" class="icon-btn" id="ach-btn">🏆 <span data-i18n="btn_ach">成就</span></button>
+        <button type="button" class="icon-btn" id="open-settings-btn">⚙️ <span data-i18n="btn_settings">設置</span></button>
+        <button type="button" class="icon-btn" id="help-btn">❓</button>
+        <button type="button" class="icon-btn" id="lang-switch-btn">🌐 中/EN</button>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+      <div class="stat-pill gold-text" style="font-size:1rem;">₵ <span id="bank-coins">0</span></div>
+      <div class="stat-pill" style="color:var(--text-muted);font-size:.78rem;"><span data-i18n="lbl_best">最高紀錄:</span> WAVE <span id="best-wave-txt" style="color:var(--accent);">1</span></div>
+    </div>
+
+    <div style="font-size:.72rem;font-weight:800;color:var(--accent);margin-bottom:4px;" data-i18n="Select_hull">選擇機體 (HULL):</div>
+    <div class="skin-bar" id="skin-selector-bar"></div>
+
+    <div style="margin-bottom:10px;padding:8px 12px;border-radius:10px;background:rgba(0,243,255,.08);border:1.5px solid var(--border-subtle);">
+      <div style="font-size:.8rem;font-weight:900;color:var(--accent);text-shadow:0 0 10px rgba(0,243,255,.8);" data-i18n="mode_classic">⚔️ 經典波次 + 大Boss</div>
+      <div style="font-size:.68rem;color:var(--text-muted);" data-i18n="mode_classic_d">每 5 波必出首領，考驗你嘅防線同走位</div>
+    </div>
+
+    <div style="font-size:.72rem;font-weight:800;color:var(--accent);margin-bottom:4px;" data-i18n="lbl_armory">永久強化 (ARMORY):</div>
+    <div class="grid" id="shop-container"></div>
+
+    <div class="btn-row">
+      <button type="button" class="action-btn" id="start-btn" data-i18n="btn_deploy">🚀 投放作戰單元</button>
+      <button type="button" class="action-btn btn-pink" id="open-mp-btn-2" onclick="document.getElementById('open-mp-btn').click();" data-i18n="btn_mp">🌐 聯機對戰</button>
+      <button type="button" class="action-btn btn-ad" id="ad-bonus-btn" data-i18n="btn_ad_500">🎬 領取 +500 ₵</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 聯機大廳 ==================== -->
+<div id="mp-lobby-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:480px;">
+    <button type="button" class="close-x-btn" id="mp-leave-btn">✕</button>
+    <h2 style="color:var(--purple);margin-bottom:4px;" data-i18n="mp_title">🌐 聯機大廳</h2>
+    <p class="sub" data-i18n="mp_sub">免費 P2P 對戰 · 網頁/APK 互通</p>
+    <div id="mp-status" style="font-size:.75rem;color:var(--accent);min-height:16px;margin-bottom:10px;text-align:center;font-family:var(--font-mono);">—</div>
+
+    <div id="mp-mode-select">
+      <div class="btn-row">
+        <button type="button" class="action-btn btn-success" id="mp-create-btn" data-i18n="mp_create">🏠 創建房間</button>
+        <button type="button" class="action-btn btn-purple" id="mp-join-btn" data-i18n="mp_join">🚪 加入房間</button>
+      </div>
+    </div>
+
+    <div id="mp-join-form" class="hidden">
+      <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <span data-i18n="mp_room_code">房間碼:</span>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="mp-code-input" maxlength="6" placeholder="ABC123" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--accent);background:#04060c;color:#fff;font-family:var(--font-mono);font-size:1.1rem;text-align:center;letter-spacing:4px;text-transform:uppercase;">
+          <button type="button" class="icon-btn" id="mp-join-confirm-btn" style="border-color:var(--success);color:var(--success);padding:10px 16px;">▶️</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="mp-room-code-box" class="hidden" style="margin:10px 0;padding:12px;background:rgba(0,243,255,.08);border:1.5px solid var(--accent);border-radius:10px;text-align:center;">
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:4px;" data-i18n="mp_room_code">房間碼:</div>
+      <div id="mp-room-code-display" style="font-family:var(--font-mono);font-size:2rem;font-weight:900;color:var(--accent);letter-spacing:6px;text-shadow:0 0 16px rgba(0,243,255,.8);">---</div>
+      <button type="button" class="icon-btn" id="mp-copy-code-btn" style="margin-top:6px;border-color:var(--warning);color:var(--warning);" data-i18n="mp_copy">📋 複製房間碼</button>
+    </div>
+
+    <div style="font-size:.75rem;color:var(--text-muted);margin-top:12px;margin-bottom:4px;">玩家列表：</div>
+    <div id="mp-player-list" style="max-height:180px;overflow-y:auto;"></div>
+
+    <div id="mp-host-controls" class="hidden btn-row" style="margin-top:14px;">
+      <button type="button" class="action-btn btn-success" id="mp-start-btn" data-i18n="mp_start">▶️ 開始對戰</button>
+      <button type="button" class="action-btn btn-secondary" id="mp-leave-btn-2" data-i18n="mp_leave">🚪 離開房間</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 多人對戰結算 ==================== -->
+<div id="mp-result-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:400px;text-align:center;">
+    <h1 id="mp-result-title" style="font-size:2rem;">🎉 勝利！</h1>
+    <p class="sub" data-i18n="mp_result">對戰結果</p>
+    <div id="mp-result-score" style="font-size:2.5rem;font-weight:900;color:var(--warning);margin:20px 0;font-family:var(--font-cyber);">🔴 0 : 0 🔵</div>
+    <div class="btn-row">
+      <button type="button" class="action-btn" id="mp-result-return-btn" data-i18n="mp_return">返回大廳</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 其他 Overlay（DIY/設置/暫停/升級/AFK/抽獎/帳號/成就/幫助/結算/廣告） ==================== -->
+
+<div id="diy-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:520px;">
+    <button type="button" class="close-x-btn" data-close="diy-overlay">✕</button>
+    <h2 style="color:var(--accent);margin-bottom:4px;" data-i18n="diy_title">🎨 賽博 DIY 工坊</h2>
+    <p class="sub" data-i18n="diy_sub">自訂彈幕與炮塔外觀</p>
+    <div class="diy-tabs">
+      <div class="diy-tab active" data-diytab="weapon" data-i18n="diy_tab_wpn">💥 彈幕設定</div>
+      <div class="diy-tab" data-diytab="turret" data-i18n="diy_tab_turret">🗼 炮塔造型</div>
+    </div>
+    <div id="diy-panel-weapon">
+      <div class="setting-row"><span>彈幕形狀</span>
+        <select id="diy-bullet-shape" style="background:#0f172a;color:#fff;border:1px solid var(--accent);padding:5px 8px;border-radius:6px;font-family:inherit;">
+          <option value="CIRCLE">能量球</option><option value="STAR">手裏劍</option><option value="HEART">霓虹心</option><option value="DIAMOND">晶體刃</option><option value="LASER">激光束</option>
+        </select></div>
+      <div class="setting-row"><span>彈幕顏色</span><input type="color" id="diy-bullet-color" value="#00f3ff" style="width:46px;height:30px;border:none;background:transparent;cursor:pointer;"></div>
+      <div class="setting-row"><span>彈道軌跡</span>
+        <select id="diy-bullet-traj" style="background:#0f172a;color:#fff;border:1px solid var(--accent);padding:5px 8px;border-radius:6px;font-family:inherit;">
+          <option value="STRAIGHT">直線直射</option><option value="WAVE">正弦波浪</option><option value="SPIRAL">螺旋擴散</option>
+        </select></div>
+      <div class="setting-row"><span>彈體大小 (<span id="diy-bsize-val">1.0x</span>)</span><input type="range" id="diy-bsize-slider" min="0.6" max="2.2" step="0.2" value="1.0"></div>
+    </div>
+    <div id="diy-panel-turret" class="hidden">
+      <div class="setting-row"><span>炮塔底座幾何</span>
+        <select id="diy-turret-shape" style="background:#0f172a;color:#fff;border:1px solid var(--accent);padding:5px 8px;border-radius:6px;font-family:inherit;">
+          <option value="HEX">六角蜂巢</option><option value="OCTA">八角重裝</option><option value="TRI">三角稜鏡</option>
+        </select></div>
+      <div class="setting-row"><span>炮塔主題色</span><input type="color" id="diy-turret-color" value="#00ff9d" style="width:46px;height:30px;border:none;background:transparent;cursor:pointer;"></div>
+      <div style="margin-top:8px;background:rgba(4,6,12,.9);border:1px solid var(--border-subtle);border-radius:10px;padding:8px;text-align:center;">
+        <div style="font-size:.7rem;color:var(--accent);font-weight:800;margin-bottom:4px;">極簡 NEON 建築預覽</div>
+        <canvas id="diy-turret-preview-canvas" width="440" height="96" style="width:100%;max-width:440px;height:96px;margin:0 auto;border-radius:6px;"></canvas>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button type="button" class="action-btn btn-success" id="diy-save-btn">💾 儲存並套用 DIY</button>
+      <button type="button" class="action-btn btn-secondary" data-close="diy-overlay">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:480px;">
+    <button type="button" class="close-x-btn" data-close="settings-overlay">✕</button>
+    <h2 id="settings-title-secret" style="color:var(--accent);margin-bottom:4px;cursor:pointer;" title="連點 5 下解鎖隱藏選單" data-i18n="set_title">⚙️ 系統設置</h2>
+    <p class="sub" data-i18n="set_sub">調整音效、畫質與語言</p>
+    <div class="setting-row"><span data-i18n="set_sfx">🔊 遊戲音效</span><button type="button" class="icon-btn" id="set-sfx-btn">ON</button></div>
+    <div class="setting-row"><span data-i18n="set_glow">✨ 雙層霓虹光暈</span><button type="button" class="icon-btn" id="set-glow-btn">ON</button></div>
+    <div class="setting-row"><span data-i18n="set_map">🗺️ 顯示雷達小地圖</span><button type="button" class="icon-btn" id="set-map-btn">ON</button></div>
+    <div class="setting-row"><span data-i18n="set_god_vis">⚡ 顯示 GOD 按鈕</span><button type="button" class="icon-btn" id="set-god-vis-btn">OFF</button></div>
+    <div class="setting-row"><span data-i18n="set_god_off">🧹 一鍵關閉所有作弊</span><button type="button" class="icon-btn" id="set-god-off-btn" style="border-color:var(--warning);color:var(--warning);">執行</button></div>
+    <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span data-i18n="set_god_pass">🎟️ 活動優惠碼</span><span id="set-god-status" style="font-size:.7rem;color:var(--text-muted);">未驗證</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input type="password" id="set-god-pass-input" placeholder="輸入優惠碼解鎖..." style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border-subtle);background:#04060c;color:#fff;font-family:inherit;">
+        <button type="button" class="icon-btn" id="set-god-pass-btn" style="border-color:var(--accent);color:var(--accent);">兌換</button>
+      </div>
+      <div id="set-pass-msg" style="font-size:.7rem;min-height:14px;"></div>
+    </div>
+    <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <span>📡 熱更新伺服器網址（留空＝只用本地）</span>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="hot-base-input" placeholder="https://your.host/neon/" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border-subtle);background:#04060c;color:var(--accent);font-family:var(--font-mono);font-size:.75rem;">
+        <button type="button" class="icon-btn" id="hot-base-save-btn" style="border-color:var(--success);color:var(--success);">儲存</button>
+      </div>
+      <div id="hot-base-msg" style="font-size:.68rem;color:var(--text-muted);min-height:14px;"></div>
+    </div>
+    <div class="setting-row"><span data-i18n="set_lang">🌐 介面語言</span><button type="button" class="icon-btn" id="set-lang-btn">繁體中文 / EN</button></div>
+    <div class="setting-row"><span style="color:var(--danger);" data-i18n="set_reset">⚠️ 重置所有存檔</span><button type="button" class="icon-btn" id="set-reset-btn" style="border-color:var(--danger);color:var(--danger);">重置</button></div>
+    <div class="btn-row"><button type="button" class="action-btn btn-secondary" data-close="settings-overlay" data-i18n="btn_close">關閉</button></div>
+  </div>
+</div>
+
+<div id="pause-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:400px;text-align:center;">
+    <button type="button" class="close-x-btn" id="pause-resume-x">✕</button>
+    <h2 style="color:var(--accent);margin-bottom:6px;" data-i18n="pause_title">⏸ 戰術暫停</h2>
+    <p class="sub" data-i18n="pause_sub">隨時調整裝備或切換自動巡航</p>
+    <div style="margin:12px 0;padding:10px;background:var(--bg-card);border-radius:10px;border:1px solid var(--border-subtle);font-family:var(--font-cyber);">
+      <div style="font-size:.8rem;color:var(--text-muted);">WAVE: <strong id="pause-wave-txt" style="color:#fff;">1</strong> ｜ <strong id="pause-coins-txt" style="color:var(--warning);">0</strong> ₵</div>
+    </div>
+    <div class="btn-row" style="flex-direction:column;">
+      <button type="button" class="action-btn" id="pause-resume-btn" data-i18n="btn_resume">▶️ 繼續作戰</button>
+      <button type="button" class="action-btn btn-success" id="pause-afk-btn" data-i18n="btn_pause_afk">🤖 切換 AFK 託管並繼續</button>
+      <button type="button" class="action-btn btn-secondary" id="pause-diy-btn">🎨 打開 DIY 工坊</button>
+      <button type="button" class="action-btn btn-secondary" id="pause-settings-btn">⚙️ 系統設置</button>
+      <button type="button" class="action-btn btn-danger" id="pause-quit-btn" data-i18n="btn_quit_run">🏠 結算並返回基地</button>
+    </div>
+  </div>
+</div>
+
+<div id="levelup-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:600px;">
+    <button type="button" class="close-x-btn" id="levelup-skip-x" title="略過">✕</button>
+    <h2 style="color:var(--purple);text-align:center;" data-i18n="lvl_title">⚡ 系統升級</h2>
+    <p class="sub" style="text-align:center;" data-i18n="lvl_sub">三選一戰術模組強化</p>
+    <div class="grid" id="upgrade-choices"></div>
+    <div class="btn-row">
+      <button type="button" class="action-btn btn-ad" id="reroll-ad-btn" data-i18n="btn_reroll">🎬 重抽模組</button>
+      <button type="button" class="action-btn btn-purple" id="takeall-ad-btn" data-i18n="btn_takeall">🎬 全拿三個模組！</button>
+    </div>
+  </div>
+</div>
+
+<div id="afk-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:440px;text-align:center;">
+    <button type="button" class="close-x-btn" data-close="afk-overlay">✕</button>
+    <h2 style="color:var(--success);margin-bottom:4px;" data-i18n="afk_title">💤 自動巡航收益</h2>
+    <p class="sub" data-i18n="afk_desc">離線自動採集星幣（上限 12 小時）</p>
+    <div class="gacha-box">
+      <div style="font-size:.78rem;color:var(--text-muted);"><span data-i18n="afk_rate_lbl">速率:</span> <span id="afk-rate-txt" style="color:#fff;font-weight:800;font-family:var(--font-cyber);">10 ₵ / min</span></div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px;"><span data-i18n="afk_time_lbl">累積時間:</span> <span id="afk-time-txt" style="color:var(--accent);font-family:var(--font-mono);">00:00</span></div>
+      <div style="font-size:2rem;font-weight:900;color:var(--warning);margin:10px 0;font-family:var(--font-cyber);">+ ₵ <span id="afk-reward-txt">0</span></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="action-btn btn-success" id="claim-afk-btn" data-i18n="btn_claim">領取收益</button>
+      <button type="button" class="action-btn btn-ad" id="claim-afk-2x-btn" data-i18n="btn_claim_2x">🎬 雙倍領取 (2x)</button>
+    </div>
+  </div>
+</div>
+
+<div id="gacha-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:520px;text-align:center;">
+    <button type="button" class="close-x-btn" data-close="gacha-overlay">✕</button>
+    <h2 style="color:#ff80bf;margin-bottom:4px;" data-i18n="gacha_title">🎰 霓虹黑市抽獎</h2>
+    <p class="sub" data-i18n="gacha_desc">抽取限定機體模型、巨額星幣與強化晶片</p>
+    <div class="stat-pill gold-text" style="justify-content:center;font-size:1rem;">₵ <span id="gacha-bank-txt">0</span></div>
+    <div class="gacha-box">
+      <div style="font-size:.72rem;color:var(--text-muted);line-height:1.5;">UR 5% ｜ SSR 15% ｜ SR 30% ｜ R 50%<br><span style="color:var(--accent);">重複稀有度自動轉星幣</span></div>
+      <div class="gacha-results-grid" id="gacha-results">
+        <div style="grid-column:1/-1;color:var(--text-muted);padding:16px 0;" data-i18n="gacha_empty">點擊下方按鈕開始抽取</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="action-btn" id="gacha-1-btn">🎲 單抽 (150 ₵)</button>
+      <button type="button" class="action-btn btn-purple" id="gacha-10-btn">🔥 十連抽 (1350 ₵)</button>
+      <button type="button" class="action-btn btn-ad" id="gacha-ad-btn">🎬 免費單抽</button>
+    </div>
+  </div>
+</div>
+
+<div id="account-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:460px;">
+    <button type="button" class="close-x-btn" data-close="account-overlay">✕</button>
+    <h2 style="color:var(--accent);margin-bottom:4px;" data-i18n="acc_title">👤 帳號與存檔管理</h2>
+    <p class="sub" data-i18n="acc_desc">支援匯出備份碼跨裝置轉移進度</p>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:.74rem;color:var(--text-muted);display:block;margin-bottom:4px;" data-i18n="acc_callsign">指揮官呼號:</label>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="commander-input" maxlength="16" placeholder="輸入名稱..." style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-subtle);background:#04060c;color:#fff;font-family:inherit;">
+        <button type="button" class="icon-btn" id="save-callsign-btn" style="border-color:var(--success);color:var(--success);" data-i18n="btn_save">儲存</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:.74rem;color:var(--text-muted);display:block;margin-bottom:4px;" data-i18n="acc_code">存檔備份碼:</label>
+      <textarea id="save-code-box" rows="3" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-subtle);background:#04060c;color:var(--accent);font-family:var(--font-mono);font-size:.75rem;" placeholder="匯出或貼上存檔碼..."></textarea>
+    </div>
+    <div id="acc-status-msg" style="font-size:.74rem;color:var(--success);margin-bottom:8px;min-height:16px;"></div>
+    <div class="btn-row">
+      <button type="button" class="action-btn btn-secondary" id="export-save-btn" data-i18n="btn_export">📤 匯出並複製</button>
+      <button type="button" class="action-btn btn-purple" id="import-save-btn" data-i18n="btn_import">📥 匯入存檔碼</button>
+    </div>
+  </div>
+</div>
+
+<div id="ach-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:540px;">
+    <button type="button" class="close-x-btn" data-close="ach-overlay">✕</button>
+    <h2 style="color:var(--warning);margin-bottom:4px;" data-i18n="ach_title">🏆 榮譽成就榜</h2>
+    <p class="sub" data-i18n="ach_desc">達成挑戰即可直接領取星幣獎勵</p>
+    <div class="ach-list" id="ach-container"></div>
+    <div class="btn-row"><button type="button" class="action-btn btn-secondary" data-close="ach-overlay" data-i18n="btn_close">關閉</button></div>
+  </div>
+</div>
+
+<div id="help-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:520px;">
+    <button type="button" class="close-x-btn" data-close="help-overlay">✕</button>
+    <h2 style="color:var(--accent);margin-bottom:6px;" data-i18n="help_title">❓ 操作指南</h2>
+    <div class="help-list">
+      <div data-i18n="help_1">🕹️ <strong>移動與自動射擊：</strong>WASD / 方向鍵，或觸控拖曳虛擬搖桿；戰機自動瞄準最近敵機。</div>
+      <div data-i18n="help_2">🏗️ <strong>懸浮建造 FAB：</strong>點擊或長按左下角 🏗️ 按鈕，扇形展開建築槽；選取後點地面放置（右鍵或 Esc 取消）。</div>
+      <div data-i18n="help_3">📡 <strong>座標傳送 (WARP)：</strong>點 WARP 或按 Space 開啟九宮格，選 Xi + Zj 瞬移到對應星區，附短暫無敵。</div>
+      <div data-i18n="help_4">🛡️ <strong>完美格擋 (PARRY)：</strong>按 J 或 PARRY 按鈕，判定窗口內受擊＝無傷＋反彈＋子彈時間＋清空冷卻。</div>
+      <div data-i18n="help_5">⚡ <strong>NOVA：</strong>E 鍵釋放超新星震波清彈幕。</div>
+      <div data-i18n="help_6">🌐 <strong>多人對戰：</strong>主選單 → 🌐 聯機 → 創建/加入房間 → 選陣營 → 主機開始。</div>
+    </div>
+    <div class="btn-row"><button type="button" class="action-btn" data-close="help-overlay" data-i18n="btn_got_it">明白！</button></div>
+  </div>
+</div>
+
+<div id="gameover-overlay" class="overlay modal-overlay hidden">
+  <div class="panel" style="max-width:440px;text-align:center;">
+    <button type="button" class="close-x-btn" id="gameover-close-x">✕</button>
+    <h1 style="color:var(--danger);font-size:1.75rem;" data-i18n="go_title">系統離線 // 戰敗</h1>
+    <p class="sub" id="go-stats-text">你在第 1 波撐了下來</p>
+    <div style="margin:12px 0;padding:12px;background:var(--bg-card);border-radius:10px;border:1px solid var(--border-subtle);">
+      <div style="font-size:.78rem;color:var(--text-muted);" data-i18n="go_loot">本局獲得星幣</div>
+      <div style="font-size:1.85rem;font-weight:900;color:var(--warning);margin-top:2px;font-family:var(--font-cyber);">+ ₵ <span id="go-coins">0</span></div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="action-btn btn-success" id="revive-ad-btn" data-i18n="btn_revive">🎬 滿血復活繼續打</button>
+      <button type="button" class="action-btn btn-ad" id="double-ad-btn" data-i18n="btn_double">🎬 雙倍結算星幣</button>
+      <button type="button" class="action-btn btn-secondary" id="return-menu-btn" data-i18n="btn_return">返回基地</button>
+    </div>
+  </div>
+</div>
+
+<div id="ad-overlay" class="overlay hidden">
+  <div class="panel" style="max-width:340px;text-align:center;">
+    <div class="spinner"></div>
+    <h3 id="ad-status-title" style="margin-bottom:6px;color:var(--accent);">正在連線贊助商訊號...</h3>
+    <p id="ad-timer-text" style="color:var(--text-muted);font-size:.84rem;">請稍候 (2s)</p>
+  </div>
+</div>
+
+<!-- ===== 熱更新啟動器 ===== -->
+<script>
+(function () {
+  "use strict";
+  var FILES = ["data.js","save.js","gacha.js","decor.js","parry.js","systems.js","engine.js","net.js","multiplayer.js","ui.js","main.js"];
+
+  var origGetById = document.getElementById.bind(document);
+  document.getElementById = function (id) {
+    var el = origGetById(id);
+    if (!el && id === "afk-quick-btn") return origGetById("afk-Quick-btn");
+    if (!el && id === "afk-Quick-btn") return origGetById("afk-quick-btn");
+    return el;
+  };
+
+  function loadScript(src, timeout) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      var done = false;
+      var t = setTimeout(function () {
+        if (!done) { done = true; s.remove(); rej(new Error("timeout " + src)); }
+      }, timeout || 8000);
+      s.src = src;
+      s.onload = function () { if (!done) { done = true; clearTimeout(t); res(); } };
+      s.onerror = function () { if (!done) { done = true; clearTimeout(t); s.remove(); rej(new Error("load fail " + src)); } };
+      document.body.appendChild(s);
+    });
+  }
+
+  async function fetchTexts(base, ver, useCache) {
+    var texts = [];
+    for (var i = 0; i < FILES.length; i++) {
+      var ctrl = new AbortController();
+      var timer = setTimeout(function(){ ctrl.abort(); }, 6000);
+      var r = await fetch(base + FILES[i] + "?v=" + encodeURIComponent(ver), {
+        cache: useCache ? "default" : "no-store",
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("fetch fail " + FILES[i]);
+      texts.push(await r.text());
+    }
+    return texts;
+  }
+
+  function loadTexts(texts) {
+    return texts.reduce(function (p, txt, i) {
+      return p.then(function () {
+        var blob = new Blob([txt + "\n//# sourceURL=hot/" + FILES[i]], { type: "text/javascript" });
+        var url = URL.createObjectURL(blob);
+        return loadScript(url, 10000).then(function () { URL.revokeObjectURL(url); });
+      });
+    }, Promise.resolve());
+  }
+
+  async function boot() {
+    if (document.fonts && document.fonts.ready) {
+      try {
+        await Promise.race([
+          document.fonts.ready,
+          new Promise(function (r) { setTimeout(r, 1500); })
+        ]);
+      } catch (e) {}
+    }
+
+    var base = "";
+    try { base = localStorage.getItem("neon_hot_base") || ""; } catch (e) {}
+    if (base && base.slice(-1) !== "/") base += "/";
+
+    if (base) {
+      try {
+        var r = await fetch(base + "manifest.json?t=" + Date.now(), { cache: "no-store" });
+        if (r.ok) {
+          var m = await r.json();
+          var localVer = "";
+          try { localVer = localStorage.getItem("neon_hot_ver") || ""; } catch (e) {}
+          var ver = m.version || "1.0.0";
+          var isSameVer = (ver === localVer);
+          var texts = await fetchTexts(base, ver, isSameVer);
+          await loadTexts(texts);
+          try { localStorage.setItem("neon_hot_ver", ver); } catch (e) {}
+          document.dispatchEvent(new Event("neon-ready"));
+          return;
+        }
+      } catch (e) {
+        console.warn("[HOT] 遠端伺服器無法連線，自動切換回本地檔案:", e);
+      }
+    }
+
+    try {
+      for (var i = 0; i < FILES.length; i++) {
+        await loadScript(FILES[i], 10000);
+      }
+      document.dispatchEvent(new Event("neon-ready"));
+    } catch (err) {
+      console.error("[BOOT ERROR] 本地遊戲腳本載入失敗:", err);
+    }
+  }
+
+  boot();
+
+  // Service Worker 註冊（PWA）
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
