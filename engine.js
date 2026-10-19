@@ -168,8 +168,10 @@ function isPointInsideHud(clientX, clientY) {
   return false;
 }
 
+// ★ 加入 MP.active 隔離，防止聯機時單機事件干擾
 window.addEventListener("keydown", e => {
   keys[e.code] = true;
+  if (typeof MP !== "undefined" && MP.active) return;
   if (state !== "PLAY") return;
 
   if (e.code === "Space") { e.preventDefault(); openTeleportGrid(); }
@@ -184,9 +186,11 @@ window.addEventListener("keyup", e => { keys[e.code] = false; });
 
 canvas.addEventListener("contextmenu", e => {
   e.preventDefault();
+  if (typeof MP !== "undefined" && MP.active) return;
   if (selectedBuildingType) selectBuildSlot(selectedBuildingType);
 });
 canvas.addEventListener("mousemove", e => {
+  if (typeof MP !== "undefined" && MP.active) return;
   if (!player) return;
   const wPos = screenToWorld(e.clientX, e.clientY);
   mouseWorldPos.x = clampToMap(wPos.x, 24);
@@ -194,6 +198,7 @@ canvas.addEventListener("mousemove", e => {
   mouseWorldPos.active = true;
 });
 canvas.addEventListener("mousedown", e => {
+  if (typeof MP !== "undefined" && MP.active) return;
   if (state !== "PLAY") return;
   if (e.button === 2) { if (selectedBuildingType) selectBuildSlot(selectedBuildingType); return; }
   if (isPointInsideHud(e.clientX, e.clientY)) return;
@@ -209,6 +214,7 @@ canvas.addEventListener("mousedown", e => {
   touchJoy.dx = 0; touchJoy.dy = 0;
 });
 window.addEventListener("mousemove", e => {
+  if (typeof MP !== "undefined" && MP.active) return;
   if (!touchJoy.active || touchJoy.id !== "mouse") return;
   const dx = e.clientX - touchJoy.startX, dy = e.clientY - touchJoy.startY;
   const dist = Math.hypot(dx, dy), maxR = 48;
@@ -218,6 +224,7 @@ window.addEventListener("mousemove", e => {
 window.addEventListener("mouseup", () => { if (touchJoy.id === "mouse") resetJoystick(); });
 
 canvas.addEventListener("touchstart", e => {
+  if (typeof MP !== "undefined" && MP.active) return;
   if (state !== "PLAY") return;
   AudioSys.init();
   for (const tTouch of e.changedTouches) {
@@ -239,6 +246,7 @@ canvas.addEventListener("touchstart", e => {
 }, { passive: false });
 
 window.addEventListener("touchmove", e => {
+  if (typeof MP !== "undefined" && MP.active) return;
   if (!touchJoy.active) return;
   for (const tTouch of e.changedTouches) {
     if (tTouch.identifier === touchJoy.id) {
@@ -633,6 +641,7 @@ function handleEnemyDeath(e, index) {
 
 function stepSimulation() {
   if (!player) return;
+  if (typeof MP !== "undefined" && MP.active) return;
 
   if (GodMode.infiniteBuildCoins) {
     buildCoins = Math.max(buildCoins, 9999);
