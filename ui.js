@@ -194,7 +194,6 @@ function closeTeleportGrid() {
   document.getElementById("teleport-overlay")?.classList.add("hidden");
 }
 
-// ============ 主按鈕 ============
 bindClick("start-btn", () => {
   OrientationMgr.requestLandscape();
   document.getElementById("menu-overlay")?.classList.add("hidden");
@@ -549,49 +548,9 @@ bindClick("hud-fullscreen-btn", () => OrientationMgr.requestLandscape());
 
 // ============ 多人模式 UI ============
 bindClick("open-mp-btn", () => {
-  MP.enterLobby();
-});
-
-bindClick("mp-create-btn", () => {
-  document.getElementById("mp-mode-select")?.classList.add("hidden");
-  document.getElementById("mp-status").textContent = t("mp_peer_loading");
-  MP.hostRoom();
-});
-
-bindClick("mp-join-btn", () => {
-  document.getElementById("mp-mode-select")?.classList.add("hidden");
-  document.getElementById("mp-join-form")?.classList.remove("hidden");
-});
-
-bindClick("mp-join-confirm-btn", () => {
-  const codeEl = document.getElementById("mp-code-input");
-  const code = (codeEl?.value || "").trim().toUpperCase();
-  if (code.length !== 6) {
-    alert("請輸入 6 位房間碼");
-    return;
+  if (typeof MP !== "undefined") {
+    MP.enterLobby();
+  } else {
+    alert("聯機模組未載入，請重新整理頁面或重啟 APP！");
   }
-  document.getElementById("mp-join-form")?.classList.add("hidden");
-  MP.joinRoom(code);
-});
-
-bindClick("mp-copy-code-btn", () => {
-  const el = document.getElementById("mp-room-code-display");
-  if (el) {
-    navigator.clipboard?.writeText(el.textContent).then(() => {
-      AudioSys.playCoin();
-      alert("房間碼已複製：" + el.textContent);
-    }).catch(() => alert("請手動複製：" + el.textContent));
-  }
-});
-
-bindClick("mp-start-btn", () => { MP.hostStartMatch(); });
-bindClick("mp-leave-btn", () => { MP.exitLobby(); });
-bindClick("mp-leave-btn-2", () => { MP.exitLobby(); });
-bindClick("mp-result-return-btn", () => {
-  document.getElementById("mp-result-overlay")?.classList.add("hidden");
-  document.getElementById("mp-hud")?.classList.add("hidden");
-  document.getElementById("menu-overlay")?.classList.remove("hidden");
-  state = "MENU";
-  syncBodyStateAttr();
-  MP.exitLobby();
 });
