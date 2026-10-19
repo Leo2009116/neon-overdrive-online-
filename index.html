@@ -136,7 +136,6 @@
   #scanlines{position:fixed;inset:0;pointer-events:none;z-index:4;background:repeating-linear-gradient(to bottom,rgba(0,243,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
   #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.7) 100%)}
 
-  /* ===== 多人模式 HUD ===== */
   #mp-hud{position:fixed;top:0;left:0;right:0;padding:8px 12px;z-index:11;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;gap:8px}
   .mp-hud-box{background:rgba(6,10,20,.92);border:1.5px solid var(--border-subtle);border-radius:10px;padding:6px 12px;pointer-events:auto}
   #mp-score-display{display:flex;gap:16px;align-items:center;font-family:var(--font-cyber);font-weight:900;font-size:1.15rem}
@@ -184,7 +183,6 @@
 
 <div id="god-penalty-banner" class="hidden" data-i18n="god_banner">⚠️ 測試模式：紀錄與成就暫停</div>
 
-<!-- HUD -->
 <div id="hud" class="hidden">
   <div class="hud-group">
     <div class="stat-pill"><span data-i18n="hud_hull">HP</span> <span id="hp-text">100/100</span></div>
@@ -210,7 +208,6 @@
   </div>
 </div>
 
-<!-- 多人模式 HUD -->
 <div id="mp-hud" class="hidden">
   <div class="mp-hud-box" style="display:flex;flex-direction:column;gap:4px;">
     <div id="mp-my-team">🔴 RED</div>
@@ -280,7 +277,6 @@
   </div>
 </div>
 
-<!-- ==================== 主選單 ==================== -->
 <div id="menu-overlay" class="overlay">
   <div class="panel">
     <div class="top-bar">
@@ -325,7 +321,6 @@
   </div>
 </div>
 
-<!-- ==================== 聯機大廳 ==================== -->
 <div id="mp-lobby-overlay" class="overlay modal-overlay hidden">
   <div class="panel" style="max-width:480px;">
     <button type="button" class="close-x-btn" id="mp-leave-btn">✕</button>
@@ -366,7 +361,6 @@
   </div>
 </div>
 
-<!-- ==================== 多人對戰結算 ==================== -->
 <div id="mp-result-overlay" class="overlay modal-overlay hidden">
   <div class="panel" style="max-width:400px;text-align:center;">
     <h1 id="mp-result-title" style="font-size:2rem;">🎉 勝利！</h1>
@@ -377,8 +371,6 @@
     </div>
   </div>
 </div>
-
-<!-- ==================== 其他 Overlay（DIY/設置/暫停/升級/AFK/抽獎/帳號/成就/幫助/結算/廣告） ==================== -->
 
 <div id="diy-overlay" class="overlay modal-overlay hidden">
   <div class="panel" style="max-width:520px;">
@@ -596,7 +588,6 @@
   </div>
 </div>
 
-<!-- ===== 熱更新啟動器 ===== -->
 <script>
 (function () {
   "use strict";
@@ -696,7 +687,6 @@
 
   boot();
 
-  // Service Worker 註冊（PWA）
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("sw.js").catch(function () {});
