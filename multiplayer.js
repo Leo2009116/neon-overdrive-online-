@@ -9,24 +9,19 @@ const MP = {
   myId: "",
   myName: "",
   myTeam: "red",
-  players: {},        // id -> { x, y, hp, team, angle, alive, name, lastUpdate }
-  bullets: [],        // 主機權威：{ x, y, vx, vy, owner, team, r, alive }
+  players: {},
+  bullets: [],
   obstacles: [],
   scores: { red: 0, blue: 0 },
   matchStart: 0,
   matchEnd: 0,
   finished: false,
-
-  // 本地輸入狀態
   input: { mx: 0, my: 0, angle: 0, shoot: false },
-
-  // 主機端計時
   _tickTimer: null,
   _inputTimer: null,
   _fireTick: 0,
   _lastSent: 0,
 
-  // ============ 進入/離開 ============
   // 防呆機制：如果舊版 HTML 沒有大廳 UI，這裡會自動生成
   injectLobbyUI() {
     if (document.getElementById("mp-lobby-overlay")) return;
@@ -37,14 +32,12 @@ const MP = {
         <h2 style="color:var(--purple);margin-bottom:4px;">🌐 聯機大廳</h2>
         <p class="sub">免費 P2P 對戰 · 網頁/APK 互通</p>
         <div id="mp-status" style="font-size:.75rem;color:var(--accent);min-height:16px;margin-bottom:10px;text-align:center;font-family:var(--font-mono);">—</div>
-        
         <div id="mp-mode-select">
           <div class="btn-row">
             <button type="button" class="action-btn btn-success" id="mp-create-btn">🏠 創建房間</button>
             <button type="button" class="action-btn btn-purple" id="mp-join-btn">🚪 加入房間</button>
           </div>
         </div>
-
         <div id="mp-join-form" class="hidden">
           <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
             <span>房間碼:</span>
@@ -54,16 +47,13 @@ const MP = {
             </div>
           </div>
         </div>
-
         <div id="mp-room-code-box" class="hidden" style="margin:10px 0;padding:12px;background:rgba(0,243,255,.08);border:1.5px solid var(--accent);border-radius:10px;text-align:center;">
           <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:4px;">房間碼:</div>
           <div id="mp-room-code-display" style="font-family:var(--font-mono);font-size:2rem;font-weight:900;color:var(--accent);letter-spacing:6px;text-shadow:0 0 16px rgba(0,243,255,.8);">---</div>
           <button type="button" class="icon-btn" id="mp-copy-code-btn" style="margin-top:6px;border-color:var(--warning);color:var(--warning);">📋 複製房間碼</button>
         </div>
-
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:12px;margin-bottom:4px;">玩家列表：</div>
         <div id="mp-player-list" style="max-height:180px;overflow-y:auto;"></div>
-
         <div id="mp-host-controls" class="hidden btn-row" style="margin-top:14px;">
           <button type="button" class="action-btn btn-success" id="mp-start-btn">▶️ 開始對戰</button>
           <button type="button" class="action-btn btn-secondary" id="mp-leave-btn-2">🚪 離開房間</button>
@@ -86,22 +76,29 @@ const MP = {
       </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
-    this.bindDynamicUI();
   },
 
+  // 負責綁定所有大廳按鈕的事件
   bindDynamicUI() {
-    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    const bind = (id, fn) => { 
+      const el = document.getElementById(id); 
+      if (el) el.onclick = fn; 
+    };
+    
     bind("mp-leave-btn", () => this.exitLobby());
     bind("mp-leave-btn-2", () => this.exitLobby());
+    
     bind("mp-create-btn", () => {
       document.getElementById("mp-mode-select").classList.add("hidden");
       this.setStatus("載入聯機模組...");
       this.hostRoom();
     });
+    
     bind("mp-join-btn", () => {
       document.getElementById("mp-mode-select").classList.add("hidden");
       document.getElementById("mp-join-form").classList.remove("hidden");
     });
+    
     bind("mp-join-confirm-btn", () => {
       const codeEl = document.getElementById("mp-code-input");
       const code = (codeEl?.value || "").trim().toUpperCase();
@@ -109,6 +106,7 @@ const MP = {
       document.getElementById("mp-join-form").classList.add("hidden");
       this.joinRoom(code);
     });
+    
     bind("mp-copy-code-btn", () => {
       const el = document.getElementById("mp-room-code-display");
       if (el) {
@@ -118,11 +116,22 @@ const MP = {
         }).catch(() => alert("請手動複製：" + el.textContent));
       }
     });
+    
     bind("mp-start-btn", () => this.hostStartMatch());
+
+    bind("mp-result-return-btn", () => {
+      document.getElementById("mp-result-overlay")?.classList.add("hidden");
+      document.getElementById("mp-hud")?.classList.add("hidden");
+      document.getElementById("menu-overlay")?.classList.remove("hidden");
+      state = "MENU";
+      syncBodyStateAttr();
+      this.exitLobby();
+    });
   },
 
   enterLobby() {
     this.injectLobbyUI(); // 確保 UI 存在
+    this.bindDynamicUI(); // ★ 關鍵修復：確保每次打開都綁定事件
     this.active = false;
     document.getElementById("mp-lobby-overlay")?.classList.remove("hidden");
     this.renderLobbyPlayers();
@@ -146,7 +155,6 @@ const MP = {
     state = "MENU"; syncBodyStateAttr();
   },
 
-  // ============ 主機流程 ============
   async hostRoom() {
     const name = (SaveSys.data.commanderName || "Commander").slice(0, 12);
     this.myName = name;
@@ -177,7 +185,6 @@ const MP = {
     }
   },
 
-  // ============ 客戶端流程 ============
   async joinRoom(code) {
     const name = (SaveSys.data.commanderName || "Commander").slice(0, 12);
     this.myName = name;
@@ -218,7 +225,6 @@ const MP = {
     if (el) el.textContent = msg;
   },
 
-  // ============ 主機消息處理 ============
   hostHandleMessage(data, conn) {
     if (!data || typeof data !== "object") return;
 
@@ -268,7 +274,6 @@ const MP = {
     Net.broadcast({ type: "lobby", players: list, scores: this.scores });
   },
 
-  // ============ 客戶端消息處理 ============
   clientHandleMessage(data) {
     if (!data || typeof data !== "object") return;
 
@@ -325,7 +330,6 @@ const MP = {
     }
   },
 
-  // ============ 主機 spawn 子彈 ============
   spawnBulletFor(p) {
     const ang = p.angle || 0;
     this.bullets.push({
@@ -339,12 +343,10 @@ const MP = {
     });
   },
 
-  // ============ 主機開始對戰 ============
   hostStartMatch() {
     if (!this.isHost) return;
     if (Object.keys(this.players).length < 1) { alert("至少需要 1 名玩家"); return; }
 
-    // 生成障礙物
     const obs = [];
     for (let i = 0; i < MP_CONFIG.OBSTACLE_COUNT; i++) {
       const r = 50 + Math.random() * 60;
@@ -361,7 +363,6 @@ const MP = {
     }
     this.obstacles = obs;
 
-    // 分配出生位置
     const teams = {};
     const playerList = [];
     let redIdx = 0, blueIdx = 0;
@@ -421,7 +422,6 @@ const MP = {
     this.fireCooldown = 0;
   },
 
-  // ============ 主機 tick ============
   hostTick() {
     if (!this.active) return;
     const now = Date.now();
@@ -435,7 +435,6 @@ const MP = {
       return;
     }
 
-    // 子彈移動 & 碰撞
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
       b.x += b.vx; b.y += b.vy;
@@ -506,7 +505,6 @@ const MP = {
     this.updateMPHud();
   },
 
-  // ============ 客戶端發送輸入 ============
   clientSendInput() {
     if (!this.active || this.isHost) return;
     const me = this.players[this.myId];
@@ -521,7 +519,6 @@ const MP = {
     }
   },
 
-  // ============ 本地輸入綁定 ============
   bindInput() {
     if (this._inputBound) return;
     this._inputBound = true;
@@ -586,7 +583,6 @@ const MP = {
     });
   },
 
-  // ============ 本地玩家更新（每幀） ============
   stepLocal() {
     if (!this.active) return;
     const me = this.players[this.myId];
@@ -624,7 +620,6 @@ const MP = {
     this.input.mx = mx; this.input.my = my;
   },
 
-  // ============ 結束對戰 ============
   endMatch(winner) {
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._inputTimer) { clearInterval(this._inputTimer); this._inputTimer = null; }
@@ -678,7 +673,6 @@ const MP = {
     });
   },
 
-  // ============ 渲染（主循環呼叫） ============
   draw() {
     ctx.fillStyle = "#04060c"; ctx.fillRect(0, 0, W, H);
     const me = this.players[this.myId];
@@ -691,23 +685,19 @@ const MP = {
 
     ctx.save(); ctx.translate(-camX, -camY);
 
-    // 背景網格
     ctx.strokeStyle = "rgba(0,243,255,.05)"; ctx.lineWidth = 1; ctx.beginPath();
     for (let x = 0; x <= MAP_SIZE; x += 100) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); }
     for (let y = 0; y <= MAP_SIZE; y += 100) { ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); }
     ctx.stroke();
 
-    // 邊框與中線
     ctx.strokeStyle = "#ff0055"; ctx.lineWidth = 4; ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
     ctx.strokeStyle = "rgba(184,41,255,.4)"; ctx.lineWidth = 3; ctx.setLineDash([20, 15]);
     ctx.beginPath(); ctx.moveTo(0, MAP_SIZE / 2); ctx.lineTo(MAP_SIZE, MAP_SIZE / 2); ctx.stroke(); ctx.setLineDash([]);
 
-    // 障礙物
     this.obstacles.forEach(o => { 
       if (window.NeonDecor?.renderObstacle) window.NeonDecor.renderObstacle(ctx, o, !SaveSys.data.settings.neonGlow); 
     });
 
-    // 玩家
     Object.entries(this.players).forEach(([id, p]) => {
       if (id === this.myId) return;
       if (!p.alive) {
@@ -718,7 +708,6 @@ const MP = {
       if (window.NeonDecor?.renderRemotePlayer) window.NeonDecor.renderRemotePlayer(ctx, p, !SaveSys.data.settings.neonGlow);
     });
 
-    // 自己
     if (me.alive) {
       if (window.NeonDecor?.renderRemotePlayer) {
         ctx.save(); ctx.translate(me.x, me.y); ctx.rotate(me.angle); ctx.scale(1, 0.86);
@@ -737,7 +726,6 @@ const MP = {
       ctx.fillText("☠️ 重生中...", me.x, me.y - 30); ctx.restore();
     }
 
-    // 子彈
     this.bullets.forEach(b => {
       const col = b.team === "red" ? "#ff3366" : "#33aaff";
       ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 12; ctx.fillStyle = col;
@@ -746,8 +734,6 @@ const MP = {
     });
 
     ctx.restore();
-
-    // 繪製小地圖 (已補回)
     this.drawMPMinimap();
   },
 
