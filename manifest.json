@@ -1,0 +1,16 @@
+{
+  "name": "Neon Overdrive Online",
+  "short_name": "NeonOverdrive",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#04060c",
+  "theme_color": "#00f3ff",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgZmlsbD0iIzA0MDYwYyIvPjxjaXJjbGUgY3g9Ijk2IiBjeT0iOTYiIHI9IjUwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iNiIvPjxjaXJjbGUgY3g9Ijk2IiBjeT0iOTYiIHI9IjE4IiBmaWxsPSIjZmYwMDdmIi8+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
