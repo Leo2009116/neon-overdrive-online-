@@ -1,8 +1,3 @@
-// ============================================================
-// NEON OVERDRIVE ONLINE // main.js
-// 初始化 + 主循環
-// ============================================================
-
 document.addEventListener("neon-ready", () => {
   applyTranslations();
   renderSkins();
@@ -41,14 +36,10 @@ document.addEventListener("neon-ready", () => {
 let _mpPrevState = null;
 
 function gameLoop(time) {
-  // ★ 多人模式優先處理
   if (typeof MP !== "undefined" && MP.active) {
     MP.stepLocal();
     MP.draw();
-    // HUD 定時刷新（主機已在 tick 更新，客端用本地步進）
-    if (!MP.isHost) {
-      MP.updateMPHud();
-    }
+    if (!MP.isHost) MP.updateMPHud();
     requestAnimationFrame(gameLoop);
     return;
   }
