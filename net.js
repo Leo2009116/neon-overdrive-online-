@@ -16,14 +16,45 @@ const Net = {
 
   async loadPeerJS() {
     if (this.loaded || window.Peer) { this.loaded = true; return; }
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
-      s.crossOrigin = "anonymous";
-      s.onload = () => { this.loaded = true; resolve(); };
-      s.onerror = () => reject(new Error("PeerJS CDN 載入失敗"));
-      document.head.appendChild(s);
-    });
+    
+    // 優先使用 jsdelivr，備用 unpkg (提升亞洲地區載入成功率)
+    const cdns = [
+      "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js",
+      "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+    ];
+
+    for (let url of cdns) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = url;
+          s.crossOrigin = "anonymous";
+          s.onload = () => { this.loaded = true; resolve(); };
+          s.onerror = () => reject(new Error("CDN load fail: " + url));
+          document.head.appendChild(s);
+        });
+        if (window.Peer) return; // 加載成功直接返回
+      } catch (e) {
+        console.warn("[Net] CDN 載入失敗，嘗試下一個...", e);
+      }
+    }
+    throw new Error("所有 PeerJS CDN 載入失敗，請檢查網路連線");
+  },
+
+  // 統一的 Peer 設定檔（加入 STUN 穿透）
+  getPeerOptions() {
+    return {
+      debug: 0,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+      }
+    };
   },
 
   genCode() {
@@ -45,16 +76,20 @@ const Net = {
     const fullId = this.PEER_PREFIX + code;
 
     return new Promise((resolve, reject) => {
-      this.peer = new Peer(fullId, { debug: 0 });
+      // 使用包含 STUN 的設定
+      this.peer = new Peer(fullId, this.getPeerOptions());
+      
       this.peer.on("open", id => {
         this.myPeerId = id;
         if (this.handlers.onOpen) this.handlers.onOpen(code);
         resolve(code);
       });
+      
       this.peer.on("connection", conn => {
         this.conns.push(conn);
         this.wireConn(conn);
       });
+      
       this.peer.on("error", e => {
         if (this.handlers.onError) this.handlers.onError(e);
         reject(e);
@@ -68,21 +103,26 @@ const Net = {
     this.roomCode = code.toUpperCase().trim();
 
     return new Promise((resolve, reject) => {
-      this.peer = new Peer(undefined, { debug: 0 });
+      // 使用包含 STUN 的設定
+      this.peer = new Peer(undefined, this.getPeerOptions());
+      
       this.peer.on("open", id => {
         this.myPeerId = id;
         const conn = this.peer.connect(this.PEER_PREFIX + this.roomCode, { reliable: true });
         this.hostConn = conn;
         this.wireConn(conn, true);
+        
         conn.on("open", () => {
           if (this.handlers.onOpen) this.handlers.onOpen(this.roomCode);
           resolve();
         });
+        
         conn.on("error", e => {
           if (this.handlers.onError) this.handlers.onError(e);
           reject(e);
         });
       });
+      
       this.peer.on("error", e => {
         if (this.handlers.onError) this.handlers.onError(e);
         reject(e);
