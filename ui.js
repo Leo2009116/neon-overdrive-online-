@@ -554,3 +554,10 @@ bindClick("open-mp-btn", () => {
     alert("聯機模組未載入，請重新整理頁面或重啟 APP！");
   }
 });
+
+// 將第二個聯機按鈕也綁定，避免使用 HTML 的 onclick 導致重複觸發
+bindClick("open-mp-btn-2", () => {
+  if (typeof MP !== "undefined") {
+    MP.enterLobby();
+  }
+});
