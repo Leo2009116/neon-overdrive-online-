@@ -1,0 +1,124 @@
+name: Build Neon Overdrive Online APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 1. 拉取完整代碼庫
+        uses: actions/checkout@v4
+
+      - name: 2. 準備網頁目錄 (www) 及生成熱更新 manifest.json
+        run: |
+          mkdir -p www
+          FILES="index.html decor.js data.js save.js gacha.js parry.js systems.js engine.js net.js multiplayer.js ui.js main.js sw.js"
+          for f in $FILES; do
+            if [ ! -f "$f" ]; then
+              echo "❌ 錯誤：找不到 $f"
+              exit 1
+            fi
+            cp "$f" www/
+          done
+          if [ -f "manifest.json" ]; then cp manifest.json www/; fi
+          TIMESTAMP=$(date +%s)
+          echo "{\"version\": \"$TIMESTAMP\"}" > www/manifest.json
+          echo "✅ 資源已準備好 (v$TIMESTAMP)"
+
+      - name: 3. 配置 Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 4. 配置 Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 5. 建立 Capacitor Android 工程
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "NeonOverdriveOnline" "com.cyber.neonoverdriveonline" --web-dir www
+          npx cap add android
+
+      - name: 6. 注入全屏、硬體加速與網路權限
+        run: |
+          npx cap copy android
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          STYLES="android/app/src/main/res/values/styles.xml"
+          STRINGS="android/app/src/main/res/values/strings.xml"
+
+          sed -i 's|android:name=".MainActivity"|android:name=".MainActivity"\n            android:screenOrientation="fullSensor"\n            android:hardwareAccelerated="true"|g' "$MANIFEST" || true
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />|g' "$MANIFEST" || true
+
+          if [ -f "$STYLES" ]; then
+            sed -i '/<style name="AppTheme"/,/<\/style>/ {
+              /<item name="android:windowFullscreen">/! s|</style>|    <item name="android:windowFullscreen">true</item>\n    </style>|g
+            }' "$STYLES" || true
+          fi
+          if [ -f "$STRINGS" ]; then
+            sed -i 's|<string name="app_name">.*</string>|<string name="app_name">NEON OVERDRIVE ONLINE</string>|g' "$STRINGS" || true
+            sed -i 's|<string name="title_activity_main">.*</string>|<string name="title_activity_main">NEON OVERDRIVE ONLINE</string>|g' "$STRINGS" || true
+          fi
+
+      - name: 7. 編譯 Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: 8. 智能處理金鑰與簽名 APK
+        run: |
+          if [ -f "release-key.jks" ]; then
+            echo "✅ 使用倉庫中已存在的 release-key.jks"
+          else
+            echo "🔑 自動生成簽名金鑰..."
+            keytool -genkeypair -v -keystore release-key.jks -alias neonkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass 123456 -keypass 123456 \
+              -dname "CN=NEON OVERDRIVE ONLINE, OU=Cyber, O=Neon, L=HK, ST=HK, C=HK"
+          fi
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          ZIPALIGN=$(find $ANDROID_HOME/build-tools -name zipalign 2>/dev/null | sort -V | tail -n 1)
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if [ -f "$UNSIGNED" ] && [ -n "$APKSIGNER" ]; then
+            if [ -n "$ZIPALIGN" ]; then
+              $ZIPALIGN -f 4 "$UNSIGNED" app-release-aligned.apk
+            else
+              cp "$UNSIGNED" app-release-aligned.apk
+            fi
+            $APKSIGNER sign --ks release-key.jks --ks-pass pass:123456 \
+              --key-pass pass:123456 --ks-key-alias neonkey \
+              --out NeonOverdriveOnline.apk app-release-aligned.apk
+            echo "✅ APK 簽名完成"
+          else
+            echo "❌ 找不到 APK 或 apksigner"
+            exit 1
+          fi
+
+      - name: 9. 上傳 APK 成品
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeonOverdriveOnline-APK
+          path: NeonOverdriveOnline.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 10. 自動部署熱更新到 gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./www
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Auto-deploy hot update files'
